@@ -27,6 +27,10 @@ public:
     const transit::StarList& stars() const { return stars_; }
     void setStars(const transit::StarList& s);                                         // emits changed()
 
+    /// Relative paths (except the keys in `keep`) made absolute against `oldBase`, so they point at
+    /// the same place after the project file moves. Returns how many changed.
+    int makePathsAbsolute(const QString& oldBase, const QStringList& keep = {});
+
     /// Base directory for the browse buttons of path keys.
     void setBaseDir(const QString& dir) { baseDir_ = dir; }
 

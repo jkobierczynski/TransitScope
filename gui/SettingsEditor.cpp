@@ -2,6 +2,7 @@
 #include "SettingsEditor.h"
 
 #include <QDir>
+#include <QFileInfo>
 #include <QFileDialog>
 #include <QHeaderView>
 #include <QRegularExpression>
@@ -293,10 +294,18 @@ void SettingsEditor::browse(Key& k) {
     QString chosen = k.isDir ? QFileDialog::getExistingDirectory(this, k.name, start)
                              : QFileDialog::getOpenFileName(this, k.name, start);
     if (chosen.isEmpty()) return;
-    // keep paths inside the project's folder relative, so the project can move with its data
-    if (!baseDir_.isEmpty()) {
-        const QString rel = QDir(baseDir_).relativeFilePath(chosen);
-        if (!rel.startsWith("../../")) chosen = rel;
+    // stored absolute: it then stays right wherever the project file is saved
+    setValue(k.section, k.name, QDir::cleanPath(QFileInfo(chosen).absoluteFilePath()));
+}
+
+int SettingsEditor::makePathsAbsolute(const QString& oldBase, const QStringList& keep) {
+    int n = 0;
+    for (auto& k : keys_) {
+        if (!k.isPath || keep.contains(k.name)) continue;
+        const QString v = k.item->text(1).trimmed();
+        if (v.isEmpty() || v.startsWith("~/") || v == "~" || QDir::isAbsolutePath(v)) continue;
+        setValue(k.section, k.name, QDir::cleanPath(QDir(oldBase).absoluteFilePath(v)));
+        ++n;
     }
-    setValue(k.section, k.name, chosen);
+    return n;
 }

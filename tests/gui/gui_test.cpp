@@ -9,6 +9,7 @@
 // usage: gui_test PROJECT.toml   (a project whose reference frame and star list exist)
 #include <QApplication>
 #include <QDir>
+#include <QFileInfo>
 #include <QListWidget>
 #include <QTemporaryDir>
 #include <QTest>
@@ -106,6 +107,18 @@ public:
         check(back.reduce.stars == starsBefore && back.reduce.target_star == 0 &&
                   back.lightcurve.exclude_stars == std::vector<size_t>{9, 30, 34},
               "the saved project holds the edited stars, target and exclusions");
+        // save as elsewhere: relative paths keep pointing at the same place
+        const QString oldBase = QFileInfo(copy).absolutePath();
+        w.settings_->setValue("reduce", "stars_file", "");
+        w.settings_->setValue("frames", "master_flat", "sub/../masters/flat.fits");
+        QDir().mkpath(tmp.filePath("elsewhere/deeper"));
+        const QString moved = tmp.filePath("elsewhere/deeper/moved.toml");
+        w.saveAsPath(moved);
+        check(w.settings_->value("frames", "master_flat") == QDir::cleanPath(oldBase + "/masters/flat.fits"),
+              "save as: a relative path becomes absolute against the old location (" + w.settings_->value("frames", "master_flat") + ")");
+        const transit::Project mp = transit::load_project(moved.toStdString());
+        check(QString::fromStdString(mp.resolve(mp.frames.master_flat)) == QDir::cleanPath(oldBase + "/masters/flat.fits"),
+              "... and resolves to the same file from the new location");
         w.modified_ = false;
         std::printf("%d failure(s)\n", failures);
         return failures ? 1 : 0;

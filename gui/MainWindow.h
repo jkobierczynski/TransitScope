@@ -51,6 +51,7 @@ private:
     void openDialog();
     bool save();
     bool saveAs();
+    bool saveAsPath(const QString& file);
     bool maybeSave();
     void setPath(const QString& path);
     void setModified(bool m);

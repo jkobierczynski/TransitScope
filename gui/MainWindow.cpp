@@ -295,8 +295,17 @@ bool MainWindow::saveAs() {
                                              tr("TransitScope projects (*.toml)"));
     if (f.isEmpty()) return false;
     if (!f.endsWith(".toml")) f += ".toml";
-    // paths in the file stay as written; they are relative to the new location from now on
-    setPath(QFileInfo(f).absoluteFilePath());
+    return saveAsPath(f);
+}
+
+bool MainWindow::saveAsPath(const QString& file) {
+    // Relative paths were relative to the old location (the home folder for a new project): make
+    // them absolute so they keep pointing at the same folders and files. A new project's output
+    // folder stays relative: it then goes next to the project file.
+    const QString oldBase = baseDir();
+    const int n = settings_->makePathsAbsolute(oldBase, path_.isEmpty() ? QStringList{"output_dir"} : QStringList{});
+    if (n) appendLog(tr("%n relative path(s) made absolute for the new project location.", nullptr, n));
+    setPath(QFileInfo(file).absoluteFilePath());
     return save();
 }
 

@@ -26,7 +26,8 @@ build/transitscope-gui myproject.toml
 ![Reference frame](docs/gui_reference_frame.png)
 
 - **Settings** (left): every key of the project file, with the template's explanations as tooltips.
-  Double-click a value to edit it; the `…` buttons choose folders and files. Each change is checked at
+  Double-click a value to edit it; the `…` buttons choose folders and files and store them as absolute
+  paths. *Save as* turns relative paths into absolute ones, so they keep pointing at the same place. Each change is checked at
   once: **Problems** lists what is wrong or missing (the same checks as `transitscope project check`),
   or says the project is ready to run.
 - **Reference frame**: the calibrated reference frame (raw until the master frames exist) with the
