@@ -1,0 +1,98 @@
+# The 2014-09-27 HD 189733 b reduction as a project.  Run with:
+#   transitscope run examples/hd189733b_2014-09-27.toml
+# (the same results as tests/run_end_to_end.sh)
+# Relative paths are relative to this file's directory; "~/" is your home directory.
+# Every key except the ones marked "required" can be left out; the value shown is then the default
+# unless it says "example".
+
+[project]
+name = "HD 189733 b 2014-09-27"             # example
+output_dir = "~/Pictures/outdir"
+
+[target]
+name = "HD 189733"                          # example
+ra = "20h00m43.713s"                        # required (ICRS), or degrees as a number
+dec = "+22d42m39.07s"                       # required
+
+[site]
+lat = 50.93                                 # required, degrees north
+lon = 5.40                                  # required, degrees east
+height_m = 50.0
+
+[camera]                                    # for the light-curve noise model
+gain_e_per_adu = 0.26
+read_noise_e = 4.0
+aperture_cm = 20.0                          # telescope aperture, for scintillation
+
+[frames]
+backend = "cfitsio"                         # or "xisfconv"
+lights_dir = "~/Pictures/HD189733b"
+lights_prefix = "HD189733b_"                # light frames: names starting with this (example)
+flats_dir = "~/Pictures/HD189733b"          # flat_*.fit next to the lights
+bias_dir = "~/Pictures/bias"
+darks_dir = "~/Pictures/darks"
+# master_bias = "masters/master_bias.fits"  # ready-made masters instead of the folders above
+# master_dark = "masters/master_dark_10s.fits"
+# master_flat = "masters/master_flat.fits"
+hot_adu = 50.0                              # hot pixel: master dark - master bias above this (ADU)
+
+[reduce]
+ref_index = 99                              # reference frame (0-based): star list and start of tracking (example)
+target_star = 0                             # index of the target in the star list
+stars_file = "../tests/ref_stars.csv"       # the 37 stars of the regression tests
+# stars = [[627.8, 648.9], [511.1, 979.7]]  # ... or inline; neither: stars are detected
+radii = [8.0, 10.0, 12.0, 14.0, 16.0, 18.0, 20.0]   # aperture radii, px
+annulus = [26.0, 40.0]                      # background annulus, px
+centroid_radius = 16.0
+centroid_iterations = 4
+half_box = 45
+edge_margin = 60.0                          # stars closer to an edge are not measured
+detect_margin = 70.0                        # detected stars closer to an edge are dropped
+threads = 0                                 # 0 = all cores
+
+[ephemeris]                                 # required
+T0 = 2454279.436714                         # BJD_TDB (example: Agol et al. 2010)
+P = 2.21857567                              # days
+T14 = 0.07527                               # transit duration, days
+
+[lightcurve]
+exclude_stars = [10, 32, 36]                # never comparison stars (example)
+comparison_stars = []                       # empty: chosen automatically
+radii = []                                  # radii to try; empty: all of [reduce] radii
+min_comparison_stars = 3
+oot_margin = 0.003                          # days beyond T14/2 still treated as in transit
+cooler_tolerance = 0.35                     # CCD-TEMP off its median by more: frame flagged
+saturation_adu = 45000.0                    # target peak above this: frame flagged
+min_relative_flux = 0.03                    # comparison candidates: at least this fraction of the target
+score_rp = 0.155                            # transit shape used to score comparison sets
+score_a = 8.84
+score_inc = 85.7
+score_u1 = 0.5
+score_u2 = 0.19
+
+[limb_darkening]
+mode = "passband"                           # computed for filter x QE; or "fixed" with u1, u2, u1_sigma, u2_sigma
+teff = 5050.0                               # required for "passband" (example)
+logg = 4.59
+feh = -0.03
+teff_err = 50.0
+logg_err = 0.02
+feh_err = 0.08
+table = "claret2011_atlas_quad"             # names in data/ld and data/passbands, or file paths
+filter = "astrodon_xop_bb"
+qe = "sony_icx285al_qe"
+filter_shift_nm = 10.0
+qe_tilt = 0.1
+model_floor = 0.05
+
+[fit]
+modes = ["constrained", "free"]             # constrained: a/Rs and inclination priors below
+steps = 16000
+discard = 2000
+thin = 10
+walkers = 40
+seed = 1
+threads = 0
+a_prior = [8.863, 0.05]                     # a/Rs: mean, sigma (example: Agol et al. 2010)
+inc_prior = [85.71, 0.05]                   # inclination, degrees
+rp_start = 0.155                            # walker start for Rp/Rs

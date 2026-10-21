@@ -1,0 +1,69 @@
+# Sony ICX285AL relative spectral response (excludes lens and light-source characteristics)
+# Source: Sony ICX285AL datasheet, "Spectral Sensitivity Characteristics", page 9,
+#         https://www.1stvision.com/cameras/sensor_specs/ICX285.pdf
+# Digitised from a rendering of the datasheet graph (grid 400-1000 nm x 0-1.0) by tracing the
+# curve pixels column by column; values at 400, 800 and 1000 nm were read by eye (label/gridline overlap).
+# Accuracy: about +-0.03 in response, +-3 nm in wavelength. Normalised to 1.0 at the peak (~530 nm).
+# Absolute QE at the peak is ~0.65 (vendor figures); only the shape matters for limb darkening.
+wavelength_nm,relative_response
+400,0.485
+410,0.591
+420,0.684
+430,0.748
+440,0.797
+450,0.832
+460,0.870
+470,0.903
+480,0.942
+490,0.972
+500,1.000
+510,1.000
+520,1.000
+530,1.000
+540,1.000
+550,1.000
+560,0.996
+570,0.986
+580,0.977
+590,0.967
+600,0.953
+610,0.942
+620,0.938
+630,0.923
+640,0.894
+650,0.876
+660,0.852
+670,0.805
+680,0.767
+690,0.732
+700,0.702
+710,0.693
+720,0.669
+730,0.632
+740,0.588
+750,0.554
+760,0.526
+770,0.482
+780,0.453
+790,0.425
+800,0.384
+810,0.342
+820,0.327
+830,0.322
+840,0.292
+850,0.268
+860,0.246
+870,0.231
+880,0.220
+890,0.212
+900,0.182
+910,0.164
+920,0.154
+930,0.144
+940,0.134
+950,0.130
+960,0.120
+970,0.115
+980,0.091
+990,0.077
+1000,0.051

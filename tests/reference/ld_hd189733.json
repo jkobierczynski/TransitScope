@@ -1,0 +1,21 @@
+{
+  "source": "Claret & Bloemen 2011, A&A 529, A75; ATLAS, vt = 2 km/s",
+  "star": {"teff": 5050, "logg": 4.59, "feh": -0.03, "teff_err": 50, "logg_err": 0.02, "feh_err": 0.08},
+  "u1": 0.52438, "u2": 0.170386,
+  "u1_sigma": 0.0531932, "u2_sigma": 0.0516081,
+  "u1_L": 0.518792, "u2_L": 0.177247, "u1_F": 0.529969, "u2_F": 0.163525,
+  "lambda_eff_nm": 669.993, "lambda_5pct_nm": 517, "lambda_95pct_nm": 890,
+  "u1_budget": {"method": 0.005588, "interp": 0.009591, "passband": 0.007086, "stellar": 0.01249, "floor": 0.05, "total": 0.05319},
+  "u2_budget": {"method": 0.006861, "interp": 0.005692, "passband": 0.002989, "stellar": 0.00866, "floor": 0.05, "total": 0.05161},
+  "bands": [
+    {"band": "B", "lambda_nm": 438, "aL": 0.851242, "bL": -0.00637592, "aF": 0.850267, "bF": -0.004317, "in_passband": false},
+    {"band": "V", "lambda_nm": 545, "aL": 0.639133, "bL": 0.133437, "aF": 0.64493, "bF": 0.126643, "loo_da": 0.0345703, "loo_db": -0.0248993, "in_passband": true},
+    {"band": "R", "lambda_nm": 641, "aL": 0.511531, "bL": 0.190202, "aF": 0.523175, "bF": 0.175828, "loo_da": 0.0199112, "loo_db": -0.00496287, "in_passband": true},
+    {"band": "I", "lambda_nm": 798, "aL": 0.400529, "bL": 0.211683, "aF": 0.416725, "bF": 0.191501, "loo_da": 0.00878301, "loo_db": -0.00134618, "in_passband": true},
+    {"band": "J", "lambda_nm": 1220, "aL": 0.223662, "bL": 0.279968, "aF": 0.247869, "bF": 0.249039, "in_passband": false},
+    {"band": "Sloang", "lambda_nm": 483, "aL": 0.773015, "bL": 0.0518434, "aF": 0.773066, "bF": 0.0525574, "loo_da": -0.0109771, "loo_db": 0.000580298, "in_passband": false},
+    {"band": "Sloanr", "lambda_nm": 626, "aL": 0.543958, "bL": 0.182605, "aF": 0.554249, "bF": 0.170058, "loo_da": -0.0124887, "loo_db": -0.00127276, "in_passband": true},
+    {"band": "Sloani", "lambda_nm": 767, "aL": 0.426315, "bL": 0.207364, "aF": 0.441637, "bF": 0.188334, "loo_da": -0.00386836, "loo_db": 7.72403e-05, "in_passband": true},
+    {"band": "Sloanz", "lambda_nm": 910, "aL": 0.347881, "bL": 0.221076, "aF": 0.365965, "bF": 0.19841, "loo_da": 0.00570652, "loo_db": 0.00873004, "in_passband": false}
+  ]
+}
