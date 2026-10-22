@@ -26,6 +26,7 @@
 
 #include "transit/calib.h"
 #include "transit/ensemble.h"
+#include "transit/export.h"
 #include "transit/fit.h"
 #include "transit/image_reader.h"
 #include "transit/limb_darkening.h"
@@ -272,9 +273,20 @@ int cmd_run(const Args& a) {
     return 0;
 }
 
+int cmd_export(const Args& a) {
+    if (a.pos.size() != 1) throw std::invalid_argument("usage: transitscope export project.toml --to exoclock|etd [--out FILE]");
+    const Project p = load_project(a.pos[0]);
+    const ExportTarget t = parse_export_target(a.need("to"));
+    const std::string out = a.get("out").empty() ? default_export_path(p, t) : a.get("out");
+    const ExportResult r = export_light_curve(p, t, out);
+    std::cout << export_target_name(t) << ": " << r.points << " points -> " << r.path << "\n\n" << r.instructions << "\n";
+    return 0;
+}
+
 void usage() {
     std::cerr << "usage: transitscope run project.toml [--from STAGE] [--to STAGE] [--only STAGE]\n"
                  "                  stages: masters reduce lightcurve ld fit\n"
+                 "       transitscope export project.toml --to exoclock|etd [--out FILE]\n"
                  "       transitscope project new FILE      (write a commented example project)\n"
                  "       transitscope project check FILE    (validate it and show what it finds)\n\n"
                  "       transitscope master --type bias|dark|flat [--bias B] --out M.fits FILES...\n"
@@ -301,6 +313,7 @@ int main(int argc, char** argv) {
         if (cmd == "fit") return cmd_fit(a);
         if (cmd == "ld") return cmd_ld(a);
         if (cmd == "run") return cmd_run(a);
+        if (cmd == "export") return cmd_export(a);
         if (cmd == "project") return cmd_project(a);
         usage();
         return 2;

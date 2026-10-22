@@ -41,6 +41,6 @@ Three layers: **libtransit** (all science, no UI) → **transitscope** CLI (scri
 3. **Fractional-pixel apertures** (exact circle/pixel overlap). Hard-edged apertures make flux jump by ~3e-4 when one boundary pixel moves in/out — visible in the regression test at r = 8 px.
 4. Defocus mode: donut-template centroid and encircled-energy sizing (`r90` is already logged).
 5. Done in 0.4.0: limb-darkening priors from filter × camera QE (`transitscope ld`). Open: a measured XOP-BB transmission curve, PHOENIX tables for M dwarfs, and power-2 / non-linear laws.
-6. Done in 0.7.0: TOML project file (`project.h`: `load_project`, `save_project`, `run_project`; `transitscope run`, `project new|check`). Open: plate solving via local `solve-field`; Gaia comparison-star candidates; ETD / ExoClock / Exoplanet Watch export.
+6. Done in 0.7.0: TOML project file (`project.h`: `load_project`, `save_project`, `run_project`; `transitscope run`, `project new|check`). Open: plate solving via local `solve-field`; Gaia comparison-star candidates; Exoplanet Watch (AAVSO) export. ETD and ExoClock export done in 0.9.0 (`export.h`, `transitscope export`, Results tab).
 7. Done in 0.3.0: pipelined multithreaded `reduce` and faster photometry kernels (see README, Performance).
 8. The MCMC fit now dominates the run time (~40 s per mode on 2 cores). 16 000 steps is > 100 autocorrelation times; ~6 000 would do, or an automatic stop at 50 τ.

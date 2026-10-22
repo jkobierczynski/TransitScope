@@ -90,6 +90,24 @@ public:
               "removing a star before the target moves the target index");
         check(w.settings_->value("lightcurve", "exclude_stars") == "9, 30, 34", "... and the excluded indices");
 
+        // export (needs the original project's lc.csv and phot.csv)
+        {
+            const transit::Project orig = transit::load_project(project.toStdString());
+            w.settings_->setValue("project", "output_dir", QString::fromStdString(orig.resolve(orig.output_dir)));
+            w.revalidate();
+        }
+        const QString exo = QDir(QString::fromStdString(w.project_->resolve(w.project_->output_dir))).exists("lc.csv")
+                                ? QString() : QStringLiteral("skip");
+        if (exo.isEmpty()) {
+            const QString f = tmp.filePath("exo.txt");
+            check(w.exportLightCurve(0, f), "export for ExoClock");
+            QFile ef(f);
+            ef.open(QIODevice::ReadOnly);
+            const QString text = QString::fromUtf8(ef.readAll());
+            check(text.startsWith("#Planet: ") && text.contains("#Time format: JD_UTC\n") && text.count('\n') > 100,
+                  "the ExoClock file has the header and the points");
+        }
+
         // validation of edits
         w.settings_->setValue("site", "lat", "north");
         w.revalidate();

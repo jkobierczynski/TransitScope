@@ -9,6 +9,7 @@
 class PlotWidget;
 class QComboBox;
 class QLabel;
+class QPushButton;
 class QTableWidget;
 
 class ResultsView : public QWidget {
@@ -19,6 +20,9 @@ public:
     /// t14_days: transit duration, shown as the predicted transit window.
     void load(const QString& outputDir, double t14_days);
 
+signals:
+    void exportRequested(int target);   // transit::ExportTarget
+
 private:
     void refresh();
     QString dir_;
@@ -28,4 +32,6 @@ private:
     PlotWidget* lc_;
     PlotWidget* res_;
     QTableWidget* table_;
+    QPushButton* exoclock_;
+    QPushButton* etd_;
 };

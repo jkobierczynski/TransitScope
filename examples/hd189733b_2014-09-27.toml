@@ -11,6 +11,7 @@ output_dir = "~/Pictures/outdir"
 
 [target]
 name = "HD 189733"                          # example
+planet = "HD189733b"                        # as ExoClock / ETD name it (for the exports)
 ra = "20h00m43.713s"                        # required (ICRS), or degrees as a number
 dec = "+22d42m39.07s"                       # required
 
@@ -23,6 +24,7 @@ height_m = 50.0
 gain_e_per_adu = 0.26
 read_noise_e = 4.0
 aperture_cm = 20.0                          # telescope aperture, for scintillation
+filter_name = "Astrodon Exo-Planet BB"      # as you choose it in the ExoClock / ETD upload forms
 
 [frames]
 backend = "cfitsio"                         # or "xisfconv"

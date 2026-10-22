@@ -82,6 +82,8 @@ private:
     void appendLog(const QString& line);
     void showProgress(int stage, qulonglong done, qulonglong total);
     void reloadResults();
+    /// target: ExportTarget. fileForTest: write there without dialogs.
+    bool exportLightCurve(int target, const QString& fileForTest);
 
     SettingsEditor* settings_;
     ImageView* image_;

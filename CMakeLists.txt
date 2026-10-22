@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.20)
-project(transitscope VERSION 0.8.2 LANGUAGES CXX)
+project(transitscope VERSION 0.9.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -32,6 +32,7 @@ add_library(transit
   src/limb_darkening.cpp
   src/reduce.cpp
   src/project.cpp
+  src/export.cpp
   src/io/reader_factory.cpp)
 target_include_directories(transit PUBLIC include)
 target_include_directories(transit SYSTEM PRIVATE third_party/tomlplusplus)

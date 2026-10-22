@@ -42,6 +42,8 @@ struct Project {
     std::string name;
     std::string output_dir = "out";      // all stage outputs go here
     std::string target_name;
+    std::string planet;                  // as the databases name it, e.g. "HD189733b" (exports)
+    std::string filter_name;             // filter as named in upload forms (exports)
     std::string ra, dec;                 // as written ("20h00m43.713s" or degrees)
     std::string stars_file;              // alternative to reduce.stars
     FrameSources frames;

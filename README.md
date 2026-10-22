@@ -38,6 +38,8 @@ build/transitscope-gui myproject.toml
   stops it. The log shows what each stage wrote. A run gives exactly the files `transitscope run` does.
 - **Results**: detrended light curve with the model and the predicted transit window, residuals, and
   the fitted parameters, for either fit. Drag on a plot to zoom, double-click to reset.
+  *Export for ExoClock…* and *Export for ETD…* write the light curve for upload and show what to
+  choose in the upload form, with a button that opens the upload page.
 
 ![Results](docs/gui_results.png)
 
@@ -79,6 +81,26 @@ same files as `tests/run_end_to_end.sh`. All outputs go to `output_dir`. Each st
 previous stage's file there, so a run can start at any stage. A typo in a key, a wrong type or a
 missing required value stops `check` and `run` with every problem and its line number. The GUI will
 read and write the same file.
+
+### Uploading to ExoClock and ETD
+
+```sh
+transitscope export myproject.toml --to exoclock     # out/exoclock_<planet>.txt
+transitscope export myproject.toml --to etd          # out/etd_<planet>.txt
+```
+
+Both files hold the comparison-ensemble light curve of the good frames (not detrended: the databases
+fit their own transit model and baseline), as tab-separated time, relative flux and uncertainty
+after a `#` header, the layout HOPS writes for these sites. The time is recomputed from each frame's
+DATE-OBS:
+
+| | time | upload form |
+|---|---|---|
+| ExoClock ([exoclock.space/upload](https://www.exoclock.space/upload/)) | JD_UTC, exposure start | Time format JD_UTC, time stamp exposure start, flux format Flux |
+| ETD ([var.astro.cz/ETD](https://var.astro.cz/ETD)) | JD_UTC (geocentric), mid-exposure | JD geocentric, brightness in flux |
+
+The planet name and filter in the header come from `[target] planet` and `[camera] filter_name`. The
+command prints what to choose in the upload form.
 
 The single commands remain for scripting:
 

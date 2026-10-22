@@ -6,6 +6,8 @@
 #include <QCloseEvent>
 #include <QComboBox>
 #include <QDateTime>
+#include <QDesktopServices>
+#include <QUrl>
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
@@ -17,6 +19,7 @@
 #include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QProgressBar>
+#include <QPushButton>
 #include <QRegularExpression>
 #include <QScreen>
 #include <QSettings>
@@ -36,6 +39,7 @@
 #include "ImageView.h"
 #include "ResultsView.h"
 #include "SettingsEditor.h"
+#include "transit/export.h"
 #include "transit/image_reader.h"
 
 using namespace transit;
@@ -186,6 +190,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     });
 
     connect(image_, &ImageView::statusMessage, this, [this](const QString& m) { statusBar()->showMessage(m, 4000); });
+    connect(results_, &ResultsView::exportRequested, this, [this](int t) { exportLightCurve(t, QString()); });
     connect(image_, &ImageView::starAdded, this, &MainWindow::addStar);
     connect(image_, &ImageView::starRemoveRequested, this, &MainWindow::removeStar);
     connect(image_, &ImageView::targetRequested, this, &MainWindow::setTarget);
@@ -694,6 +699,39 @@ void MainWindow::runFinished(bool ok, const QString& message) {
     imageKey_.clear();   // masters may have changed
     reloadResults();
     emit runDone(ok);
+}
+
+bool MainWindow::exportLightCurve(int target, const QString& fileForTest) {
+    if (!project_) return false;
+    const ExportTarget t = ExportTarget(target);
+    const QString name = export_target_name(t);
+    QString file = fileForTest;
+    if (file.isEmpty()) {
+        file = QFileDialog::getSaveFileName(this, tr("Export for %1").arg(name),
+                                            QString::fromStdString(default_export_path(*project_, t)), tr("Text files (*.txt)"));
+        if (file.isEmpty()) return false;
+    }
+    ExportResult r;
+    try {
+        r = export_light_curve(*project_, t, file.toStdString());
+    } catch (const std::exception& e) {
+        if (fileForTest.isEmpty()) QMessageBox::warning(this, tr("Export for %1").arg(name), QString::fromStdString(e.what()));
+        return false;
+    }
+    appendLog(tr("%1 export: %2 points -> %3").arg(name).arg(r.points).arg(QString::fromStdString(r.path)));
+    if (!fileForTest.isEmpty()) return true;
+    QMessageBox box(this);
+    box.setWindowTitle(tr("Export for %1").arg(name));
+    box.setIcon(QMessageBox::Information);
+    box.setText(tr("Wrote %1 points to\n%2").arg(r.points).arg(QString::fromStdString(r.path)));
+    box.setInformativeText(QString::fromStdString(r.instructions));
+    box.setTextInteractionFlags(Qt::TextSelectableByMouse);
+    QPushButton* open = box.addButton(tr("Open the upload page"), QMessageBox::ActionRole);
+    box.addButton(QMessageBox::Close);
+    box.exec();
+    if (box.clickedButton() == open)
+        QDesktopServices::openUrl(QUrl(t == ExportTarget::ExoClock ? "https://www.exoclock.space/upload/" : "https://var.astro.cz/ETD"));
+    return true;
 }
 
 void MainWindow::reloadResults() {

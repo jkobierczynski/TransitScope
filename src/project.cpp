@@ -203,6 +203,7 @@ Project parse_project(const std::string& text, const std::string& base_dir) {
     {
         auto s = rd.section("target");
         s.string("name", p.target_name);
+        s.string("planet", p.planet);
         s.angle("ra", p.ra, true);
         s.angle("dec", p.dec, true);
         s.finish();
@@ -226,6 +227,7 @@ Project parse_project(const std::string& text, const std::string& base_dir) {
         s.number("gain_e_per_adu", p.lightcurve.gain);
         s.number("read_noise_e", p.lightcurve.read_noise_e);
         s.number("aperture_cm", p.lightcurve.aperture_cm);
+        s.string("filter_name", p.filter_name);
         s.finish();
     }
     {
@@ -436,10 +438,10 @@ std::string project_to_toml(const Project& p) {
     const auto& ft = p.fit;
     o << "# TransitScope project\n\n";
     o << "[project]\nname = " << str(p.name) << "\noutput_dir = " << str(p.output_dir) << "\n\n";
-    o << "[target]\nname = " << str(p.target_name) << "\nra = " << angle(p.ra) << "\ndec = " << angle(p.dec) << "\n\n";
+    o << "[target]\nname = " << str(p.target_name) << "\nplanet = " << str(p.planet) << "\nra = " << angle(p.ra) << "\ndec = " << angle(p.dec) << "\n\n";
     o << "[site]\nlat = " << num(r.site.lat_deg) << "\nlon = " << num(r.site.lon_deg) << "\nheight_m = " << num(r.site.height_m) << "\n\n";
     o << "[camera]\ngain_e_per_adu = " << num(c.gain) << "\nread_noise_e = " << num(c.read_noise_e)
-      << "\naperture_cm = " << num(c.aperture_cm) << "\n\n";
+      << "\naperture_cm = " << num(c.aperture_cm) << "\nfilter_name = " << str(p.filter_name) << "\n\n";
     o << "[frames]\nbackend = " << str(f.backend) << "\nlights_dir = " << str(f.lights_dir) << "\nlights_prefix = " << str(f.lights_prefix) << "\n";
     for (auto [k, v] : {std::pair{"flats_dir", &f.flats_dir}, {"bias_dir", &f.bias_dir}, {"darks_dir", &f.darks_dir},
                         {"master_bias", &f.master_bias}, {"master_dark", &f.master_dark}, {"master_flat", &f.master_flat}})
@@ -505,6 +507,7 @@ output_dir = "out"                          # masters, phot.csv, lc.csv, ld.json
 
 [target]
 name = "HD 189733"                          # example
+planet = "HD189733b"                        # as ExoClock / ETD name it (for the exports; example)
 ra = "20h00m43.713s"                        # required (ICRS), or degrees as a number
 dec = "+22d42m39.07s"                       # required
 
@@ -517,6 +520,7 @@ height_m = 50.0
 gain_e_per_adu = 0.26
 read_noise_e = 4.0
 aperture_cm = 20.0                          # telescope aperture, for scintillation
+filter_name = "Astrodon Exo-Planet BB"      # as you choose it in the ExoClock / ETD upload forms (example)
 
 [frames]
 backend = "cfitsio"                         # or "xisfconv"

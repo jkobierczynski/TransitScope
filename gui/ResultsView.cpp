@@ -9,6 +9,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
+#include <QPushButton>
 #include <QSplitter>
 #include <QTableWidget>
 #include <QTextStream>
@@ -65,6 +66,16 @@ ResultsView::ResultsView(QWidget* parent) : QWidget(parent) {
     summary_ = new QLabel;
     summary_->setTextInteractionFlags(Qt::TextSelectableByMouse);
     top->addWidget(summary_, 1);
+    exoclock_ = new QPushButton(tr("Export for ExoClock…"));
+    etd_ = new QPushButton(tr("Export for ETD…"));
+    exoclock_->setToolTip(tr("Light curve as ExoClock's upload form reads it: JD_UTC at exposure start, flux"));
+    etd_->setToolTip(tr("Light curve as ETD's upload reads it: geocentric JD_UTC at mid-exposure, flux"));
+    exoclock_->setEnabled(false);
+    etd_->setEnabled(false);
+    top->addWidget(exoclock_);
+    top->addWidget(etd_);
+    connect(exoclock_, &QPushButton::clicked, this, [this] { emit exportRequested(0); });
+    connect(etd_, &QPushButton::clicked, this, [this] { emit exportRequested(1); });
 
     lc_ = new PlotWidget;
     res_ = new PlotWidget;
@@ -110,6 +121,8 @@ void ResultsView::refresh() {
     summary_->clear();
     const QDir d(dir_);
     const Csv lc = readCsv(d.filePath("lc.csv"));
+    exoclock_->setEnabled(!lc.rows.isEmpty());
+    etd_->setEnabled(!lc.rows.isEmpty());
     if (lc.rows.isEmpty()) {
         lc_->setMessage(tr("No light curve yet (lc.csv in %1).\nRun the project up to the lightcurve stage.").arg(dir_));
         res_->setMessage(" ");
