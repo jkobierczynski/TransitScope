@@ -176,7 +176,7 @@ EnsembleResult build_light_curve(const PhotTable& t, const EnsembleConfig& cfg) 
                 const double v = model_rms(c, ensemble_lc(c, ri, cc, nullptr), R.tc_pred);
                 if (v < bmin) { bmin = v; drop = k; }
             }
-            if (bmin < cur * 0.998) { comps.erase(comps.begin() + drop); cur = bmin; }
+            if (bmin < cur * (1.0 - cfg.min_improvement)) { comps.erase(comps.begin() + drop); cur = bmin; }
             else break;
         }
         const auto lc = ensemble_lc(c, ri, comps, nullptr);

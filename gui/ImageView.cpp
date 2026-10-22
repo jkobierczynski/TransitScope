@@ -106,8 +106,10 @@ void ImageView::redrawStars() {
     const double r = ap_.radii.empty() ? 10 : ap_.radii[ap_.radii.size() / 2];
     for (size_t i = 0; i < stars_.size(); ++i) {
         const QPointF c = toScene(stars_[i].first, stars_[i].second);
-        QColor col = i == target_ ? QColor(255, 80, 80) : excluded_.contains(i) ? QColor(150, 150, 150) : QColor(80, 220, 120);
-        QPen pen(col, 1.5);
+        const bool comp = comps_.contains(i);
+        QColor col = i == target_ ? QColor(255, 80, 80) : excluded_.contains(i) ? QColor(150, 150, 150)
+                   : comp ? QColor(90, 200, 255) : QColor(80, 220, 120);
+        QPen pen(col, comp ? 2.5 : 1.5);
         pen.setCosmetic(true);
         if (excluded_.contains(i)) pen.setStyle(Qt::DashLine);
         auto* e = scene()->addEllipse(c.x() - r, c.y() - r, 2 * r, 2 * r, pen);
@@ -123,7 +125,9 @@ void ImageView::redrawStars() {
                 markers_ << a;
             }
         }
-        auto* t = scene()->addSimpleText(i == target_ ? QString("%1 T").arg(i) : QString::number(i));
+        QString label = i == target_ ? QString("%1 T").arg(i) : QString::number(i);
+        if (comp) label += QString("  %1%").arg(100 * comps_.value(i), 0, 'f', 0);
+        auto* t = scene()->addSimpleText(label);
         t->setBrush(col);
         t->setFlag(QGraphicsItem::ItemIgnoresTransformations);
         t->setPos(c.x() + r * 0.75, c.y() - r * 0.75);

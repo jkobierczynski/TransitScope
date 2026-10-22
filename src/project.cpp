@@ -291,6 +291,7 @@ Project parse_project(const std::string& text, const std::string& base_dir) {
         s.numbers("comparison_stars", c.comps);
         s.numbers("radii", c.radii);
         s.number("min_comparison_stars", c.min_comps);
+        s.number("min_improvement", c.min_improvement);
         s.number("oot_margin", c.oot_margin);
         s.number("cooler_tolerance", c.cooler_tol);
         s.number("saturation_adu", c.sat_adu);
@@ -460,7 +461,7 @@ std::string project_to_toml(const Project& p) {
       << "\nthreads = " << r.threads << "\n\n";
     o << "[ephemeris]\nT0 = " << num(c.eph.T0) << "\nP = " << num(c.eph.P) << "\nT14 = " << num(c.eph.T14) << "\n\n";
     o << "[lightcurve]\nexclude_stars = " << list(c.exclude_stars) << "\ncomparison_stars = " << list(c.comps)
-      << "\nradii = " << list(c.radii) << "\nmin_comparison_stars = " << c.min_comps << "\noot_margin = " << num(c.oot_margin)
+      << "\nradii = " << list(c.radii) << "\nmin_comparison_stars = " << c.min_comps << "\nmin_improvement = " << num(c.min_improvement) << "\noot_margin = " << num(c.oot_margin)
       << "\ncooler_tolerance = " << num(c.cooler_tol) << "\nsaturation_adu = " << num(c.sat_adu)
       << "\nmin_relative_flux = " << num(c.min_rel_flux) << "\nscore_rp = " << num(c.score_model.rp)
       << "\nscore_a = " << num(c.score_model.a) << "\nscore_inc = " << num(c.score_model.inc)
@@ -558,6 +559,7 @@ exclude_stars = [10, 32, 36]                # never comparison stars (example)
 comparison_stars = []                       # empty: chosen automatically
 radii = []                                  # radii to try; empty: all of [reduce] radii
 min_comparison_stars = 3
+min_improvement = 0.01                      # a star is dropped only if that lowers the residual RMS by more than 1 %
 oot_margin = 0.003                          # days beyond T14/2 still treated as in transit
 cooler_tolerance = 0.35                     # CCD-TEMP off its median by more: frame flagged
 saturation_adu = 45000.0                    # target peak above this: frame flagged

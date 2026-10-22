@@ -21,6 +21,9 @@ struct EnsembleConfig {
     std::vector<double> radii;            // empty = try all radii in the table
     std::vector<size_t> comps;            // empty = automatic selection
     size_t min_comps = 3;
+    // a star is dropped from the ensemble only if that lowers the light curve's residual RMS by more
+    // than this fraction (a margin well above the RMS changes small photometry differences cause)
+    double min_improvement = 0.01;
     // fixed geometry used to score comparison sets (free Tc, Rp/Rs, quadratic baseline)
     TransitParams score_model{0, 2.21857567, 0.155, 8.84, 85.7, 0.50, 0.19};
     // noise model

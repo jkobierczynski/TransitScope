@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.20)
-project(transitscope VERSION 0.9.0 LANGUAGES CXX)
+project(transitscope VERSION 0.10.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -104,3 +104,6 @@ if(TRANSIT_WITH_GUI)
     target_link_libraries(gui_test PRIVATE transit Qt6::Widgets Qt6::Concurrent Qt6::Test)
   endif()
 endif()
+
+add_executable(comp_stability_test tests/unit/comp_stability_test.cpp)
+target_link_libraries(comp_stability_test PRIVATE transit)

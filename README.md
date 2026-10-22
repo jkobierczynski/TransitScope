@@ -31,7 +31,8 @@ build/transitscope-gui myproject.toml
   once: **Problems** lists what is wrong or missing (the same checks as `transitscope project check`),
   or says the project is ready to run.
 - **Reference frame**: the calibrated reference frame (raw until the master frames exist) with the
-  star list. Click on a star-free spot to add a star (centroided), right-click a star to make it the
+  star list; after a run, the comparison stars of the light curve are drawn in blue with their weights.
+  Click on a star-free spot to add a star (centroided), right-click a star to make it the
   target, exclude it from the comparison stars or remove it; star indices in the other settings are
   kept consistent. *Stars → Detect stars* replaces the list. An edited list is saved in the project file.
 - **Run**: runs the chosen stages (from … to …) in the background with a progress bar; *Cancel*
@@ -236,6 +237,8 @@ FitCurves curves = fit_curves(pts.t, pts.f, fit, fit_cfg);  // detrended flux, m
 
 `tests/gui/gui_test PROJECT.toml` (built with the GUI, runs offscreen with `QT_QPA_PLATFORM=offscreen`)
 opens a project and checks star picking, index bookkeeping, validation and saving.
+`tests/unit/comp_stability_test phot.csv` checks that the comparison selection does not change when an
+unselected star is excluded or the photometry changes slightly (flux noise of 1e-4 to 1e-3).
 `tests/unit/project_test` checks the project file (template, round trip, paths, error reports).
 `tests/unit/reduce_api_test` and `tests/unit/fit_api_test` check progress reporting, cancelling,
 that a callback or the thread count does not change results, and the in-memory tables against the
@@ -249,7 +252,7 @@ Python (numpy, astropy, batman, emcee) is used only by the test scripts, never a
 python3 -I tests/compare_reference.py phot.csv tests/reference/phot.npz tests/reference/lc.npz   # photometry + timing
 python3 -I tests/unit/check_model_vs_batman.py build/model_dump                                   # transit model
 python3 -I tests/npz_to_phot_csv.py tests/reference/phot.npz tests/reference/lc.npz phot_ref.csv  # same input as Python
-transitscope lightcurve --phot phot_ref.csv ... --out lc.csv
+transitscope lightcurve --phot phot_ref.csv ... --min-improvement 0.002 --out lc.csv   # the reference's selection rule
 python3 -I tests/compare_lightcurve.py lc.csv tests/reference/lc.npz 1e-9                         # ensemble
 transitscope fit --lc lc.csv --mode constrained --out fit.json
 python3 -I tests/compare_fit.py fit.json tests/reference/fitC.json                                # MCMC
@@ -269,7 +272,8 @@ Transit model: max |C++ − batman| = 2.4e-8 over 128 parameter sets (Rp/Rs 0.01
 full transits, four limb-darkening laws) × 401 times.
 
 Light curve on identical photometry input: same good/out-of-transit masks, same aperture (10 px),
-same 13 comparison stars and weights, flux identical to < 1e-9.
+same 13 comparison stars and weights, flux identical to < 1e-9 (with `--min-improvement 0.002`, the
+reference's rule; with the default 1 % both photometries keep the same 14 stars).
 
 MCMC (16 000 steps, 3 seeds) vs emcee: every parameter within 0.06 σ of the emcee median, error
 bars within 2 %, same autocorrelation times (~120–155 steps).
@@ -280,8 +284,8 @@ bars within 2 %, same autocorrelation times (~120–155 steps).
 | C++ on the same light curve | 2456928.41600 ± 0.00043 | 0.1508 ± 0.0049 | −0.1 ± 0.6 min |
 | C++ end to end from raw frames | 2456928.41608 ± 0.00043 | 0.1511 ± 0.0048 | +0.0 ± 0.6 min |
 
-The end-to-end run differs by 0.2 σ: with its own photometry the comparison selection keeps one
-extra faint star (14 instead of 13) — both selections give the same residual RMS.
+The end-to-end run differs by 0.2 σ: with its own photometry the old 0.2 % selection rule kept one
+more star (14 instead of 13). Since 0.10.0 (1 % rule) both photometries select the same 14 stars.
 
 ## Backend comparison (CFITSIO 4.3.1 vs libxisfconv 0.25.0)
 

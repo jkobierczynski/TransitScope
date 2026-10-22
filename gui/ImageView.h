@@ -6,6 +6,7 @@
 //   wheel                       zoom around the cursor; drag pans
 #pragma once
 #include <QGraphicsView>
+#include <QMap>
 #include <QSet>
 
 #include "transit/image.h"
@@ -26,6 +27,8 @@ public:
 
     void setStars(const transit::StarList& stars, size_t target, const QSet<size_t>& excluded);
     void setAperture(const transit::ApertureConfig& ap) { ap_ = ap; redrawStars(); }
+    /// Comparison stars of the last light curve with their ensemble weights (empty: none shown).
+    void setComparisons(const QMap<size_t, double>& weights) { comps_ = weights; redrawStars(); }
     /// Stretch: black and white points as multiples of the background noise above the median.
     void setStretch(double low_sigma, double high_sigma);
     void fitInView();
@@ -59,6 +62,7 @@ private:
     transit::StarList stars_;
     size_t target_ = 0;
     QSet<size_t> excluded_;
+    QMap<size_t, double> comps_;
     long selected_ = -1;
     transit::ApertureConfig ap_;
     double lowSigma_ = -1.5, highSigma_ = 60;

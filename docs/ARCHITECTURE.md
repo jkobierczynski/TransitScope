@@ -37,7 +37,7 @@ Three layers: **libtransit** (all science, no UI) → **transitscope** CLI (scri
 ## Known limitations / roadmap
 
 1. Done in 0.2.0: ensemble light curve and MCMC fit (see README for the regression results).
-2. Comparison selection is greedy and keeps any star that lowers the residual RMS by > 0.2 %; a faint, noisy star can tip in or out on tiny photometry differences. Options: a minimum weight, or selecting on a held-out half of the frames.
+2. Done in 0.10.0: stable comparison selection. Backward elimination drops a star only if that lowers the residual RMS by more than `min_improvement` (1 %, was 0.2 %). With 0.2 %, star 12 (weight 5.5 %) sat on the threshold: flux noise of 1e-4 changed the selection in 5 of 12 runs, and the Python and C++ photometry chose 13 and 14 stars. With 1 % no run changed it up to 3e-4, both photometries give the same 14 stars, and the 2014 light curve is unchanged (`tests/unit/comp_stability_test`). A minimum weight was considered but would not have helped: the flipping star was not a faint one.
 3. **Fractional-pixel apertures** (exact circle/pixel overlap). Hard-edged apertures make flux jump by ~3e-4 when one boundary pixel moves in/out — visible in the regression test at r = 8 px.
 4. Defocus mode: donut-template centroid and encircled-energy sizing (`r90` is already logged).
 5. Done in 0.4.0: limb-darkening priors from filter × camera QE (`transitscope ld`). Open: a measured XOP-BB transmission curve, PHOENIX tables for M dwarfs, and power-2 / non-linear laws.

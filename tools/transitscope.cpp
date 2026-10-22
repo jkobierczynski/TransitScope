@@ -120,6 +120,7 @@ int cmd_lightcurve(const Args& a) {
     cfg.cooler_tol = std::stod(a.get("cooler-tol", "0.35"));
     cfg.sat_adu = std::stod(a.get("sat-adu", "45000"));
     cfg.min_rel_flux = std::stod(a.get("min-rel-flux", "0.03"));
+    cfg.min_improvement = std::stod(a.get("min-improvement", "0.01"));
     cfg.exclude_stars = parse_index_list(a.get("exclude-stars", ""));
     if (!a.get("radii").empty()) cfg.radii = parse_list(a.get("radii"));
     cfg.comps = parse_index_list(a.get("comps", ""));

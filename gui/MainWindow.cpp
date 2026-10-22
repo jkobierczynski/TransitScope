@@ -11,6 +11,7 @@
 #include <QDir>
 #include <QDockWidget>
 #include <QFileDialog>
+#include <QFile>
 #include <QFileInfo>
 #include <QFutureWatcher>
 #include <QLabel>
@@ -736,7 +737,41 @@ bool MainWindow::exportLightCurve(int target, const QString& fileForTest) {
 
 void MainWindow::reloadResults() {
     if (!project_) return;
-    results_->load(QString::fromStdString(project_->resolve(project_->output_dir)), project_->lightcurve.eph.T14);
+    const QString out = QString::fromStdString(project_->resolve(project_->output_dir));
+    results_->load(out, project_->lightcurve.eph.T14);
+    updateComparisonMarks(out);
+}
+
+void MainWindow::updateComparisonMarks(const QString& outDir) {
+    // comparison stars and weights from lc.csv's header; star indices refer to the star list of the
+    // run that wrote phot.csv, so they are shown only while the list has the same number of stars
+    QMap<size_t, double> marks;
+    QFile lc(QDir(outDir).filePath("lc.csv"));
+    QStringList comps, weights;
+    if (lc.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        while (!lc.atEnd()) {
+            const QString line = QString::fromUtf8(lc.readLine()).trimmed();
+            if (!line.startsWith('#')) break;
+            if (line.startsWith("# comparison_stars=")) comps = line.mid(19).split(';', Qt::SkipEmptyParts);
+            if (line.startsWith("# weights=")) weights = line.mid(10).split(';', Qt::SkipEmptyParts);
+        }
+    }
+    long nsPhot = -1;
+    QFile ph(QDir(outDir).filePath("phot.csv"));
+    if (ph.open(QIODevice::ReadOnly) && ph.size() > 0) {
+        ph.seek(std::max<qint64>(0, ph.size() - 4096));
+        const QStringList lines = QString::fromUtf8(ph.readAll()).split('\n', Qt::SkipEmptyParts);
+        if (!lines.isEmpty()) {
+            const QStringList f = lines.last().split(',');
+            if (f.size() > 7) nsPhot = f[7].toLong() + 1;
+        }
+    }
+    const bool sameList = nsPhot == long(currentStars().size());
+    if (sameList && comps.size() == weights.size())
+        for (int i = 0; i < comps.size(); ++i) marks[comps[i].toULongLong()] = weights[i].toDouble();
+    image_->setComparisons(marks);
+    if (!comps.isEmpty() && !sameList)
+        statusBar()->showMessage(tr("Comparison stars of the last run not shown: the star list changed since."), 6000);
 }
 
 void MainWindow::runForTest(const QString& screenshot, double cancelAfterSeconds) {
