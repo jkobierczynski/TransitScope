@@ -41,6 +41,28 @@ build/transitscope-gui myproject.toml
 
 ![Results](docs/gui_results.png)
 
+## Test data
+
+The observation used throughout this README is available for anyone who wants to try TransitScope:
+a transit of **HD 189733 b** (near M27) on 2014-09-27, observed by the author.
+
+**[Download the 2014-09-27 HD 189733 b captures (Google Drive)](https://drive.google.com/drive/folders/0B5ahrk9momwbY18taHUwbWdCZEk?resourcekey=0-W6LsPB_5vPOh9zWC_0uPUg)**
+
+| | |
+|---|---|
+| lights | 718 × 10 s, `HD189733b_001.fit` … `HD189733b_718.fit`, defocused, 20:38–23:21 UTC |
+| flats | 31 × 2 s, `flat_*.fit`, in the same folder |
+| bias, darks | 40 bias frames and 50 × 10 s darks at −5 °C |
+| camera | Atik 314L+ (Sony ICX285AL), 1391 × 1039 px, 16-bit FITS |
+| optics | Skywatcher Quattro 800 mm f/4 with TeleVue Paracorr Type 2, Astrodon XOP-BB exoplanet filter |
+| size | about 2.4 GB |
+
+Put the frames in folders of your choice, point the folder settings of
+`examples/hd189733b_2014-09-27.toml` at them (`lights_dir`, `flats_dir`, `bias_dir`, `darks_dir`) and
+run it. With `stars_file = "../tests/ref_stars.csv"` the results should match the tables below
+(Tc ≈ 2456928.4161 BJD_TDB, Rp/Rs ≈ 0.152). The frames are plain FITS with the capture software's
+own header cards; they contain no observer or site information.
+
 ## Use
 
 The easiest way is a project file holding every setting of one observation:
