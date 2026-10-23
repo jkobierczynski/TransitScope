@@ -2,6 +2,7 @@
 #include "transit/reduce.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <filesystem>
@@ -23,9 +24,10 @@ std::vector<std::string> find_light_frames(const std::string& dir, const std::st
     std::vector<std::string> files;
     for (const auto& e : fs::directory_iterator(dir)) {
         const auto name = e.path().filename().string();
-        const auto ext = e.path().extension().string();
+        std::string ext = e.path().extension().string();
+        for (auto& ch : ext) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
         if ((ext == ".fit" || ext == ".fits" || ext == ".fts") && name.rfind(prefix, 0) == 0)
-            files.push_back(e.path().string());
+            files.push_back(e.path().generic_string());
     }
     std::sort(files.begin(), files.end());
     return files;

@@ -1,0 +1,116 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Build the library, CLI, desktop application and tests on Linux, macOS and Windows, and run the
+# checks that need no image data (tests/ci_checks.sh).
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux (Ubuntu 24.04, GCC, system ERFA)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ pkg-config \
+            libcfitsio-dev liberfa-dev qt6-base-dev python3-numpy python3-pip
+          pip install --break-system-packages batman-package
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSIT_WITH_GUI=ON
+      - name: Build
+        run: cmake --build build
+      - name: Checks
+        run: tests/ci_checks.sh build
+      - name: GUI starts
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: build/transitscope-gui --version
+
+  linux-bundled-erfa:
+    name: Linux (Clang, ERFA built from source)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build clang pkg-config \
+            libcfitsio-dev python3-numpy
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++
+             -DCMAKE_C_COMPILER=clang -DTRANSIT_ERFA_FROM_SOURCE=ON
+      - name: Build
+        run: cmake --build build
+      - name: Checks
+        run: tests/ci_checks.sh build
+
+  macos:
+    name: macOS (Apple Clang, Homebrew)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          brew install ninja pkg-config cfitsio qt
+          brew install erfa || echo "no ERFA formula: it is built from source"
+          python -m pip install numpy batman-package
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSIT_WITH_GUI=ON
+             -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
+      - name: Build
+        run: cmake --build build
+      - name: Checks
+        env:
+          PYTHON: python
+        run: tests/ci_checks.sh build
+      - name: GUI starts
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: build/transitscope-gui --version
+
+  windows:
+    name: Windows (MSYS2 UCRT64, GCC)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-cfitsio
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-numpy
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSIT_WITH_GUI=ON
+      - name: Build
+        run: cmake --build build
+      - name: Checks
+        env:
+          PYTHON: python
+        run: tests/ci_checks.sh build
+      - name: GUI starts
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: build/transitscope-gui.exe --version

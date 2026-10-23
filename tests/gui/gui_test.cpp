@@ -14,6 +14,7 @@
 #include <QTemporaryDir>
 #include <QTest>
 
+#include <clocale>
 #include <cstdio>
 
 #include "../../gui/ImageView.h"
@@ -145,6 +146,7 @@ public:
 
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
+    std::setlocale(LC_NUMERIC, "C");
     QApplication::setOrganizationName("transitscope-test");
     if (argc < 2) {
         std::fprintf(stderr, "usage: %s PROJECT.toml\n", argv[0]);

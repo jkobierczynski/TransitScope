@@ -51,7 +51,9 @@ int main() {
     check(t.resolve("lights") == "/data/obs/lights" && t.resolve("/abs/x") == "/abs/x" &&
               t.resolve("../other/./f.fits") == "/data/other/f.fits" && t.output("lc.csv") == "/data/obs/out/lc.csv",
           "relative paths resolve against the project's folder");
-    if (const char* home = std::getenv("HOME")) check(t.resolve("~/astro") == std::string(home) + "/astro", "~/ is the home folder");
+    const char* home = std::getenv("HOME");
+    if (!home || !*home) home = std::getenv("USERPROFILE");
+    if (home) check(t.resolve("~/astro") == (std::filesystem::path(home) / "astro").lexically_normal().generic_string(), "~/ is the home folder");
 
     // errors
     const std::string e = error_of(R"(
@@ -89,7 +91,7 @@ P = 2
     save_project(path, t);
     const Project loaded = load_project(path);
     check(project_to_toml(loaded) == once && !std::filesystem::exists(path + ".tmp"), "save_project + load_project");
-    check(loaded.base_dir == std::filesystem::absolute(path).parent_path().string(), "load_project: paths relative to the file");
+    check(loaded.base_dir == std::filesystem::absolute(path).parent_path().generic_string(), "load_project: paths relative to the file");
     std::filesystem::remove(path);
 
     std::printf("%d failure(s)\n", failures);

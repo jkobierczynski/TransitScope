@@ -1,2 +1,9 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# shell scripts must keep LF line endings, also in a Windows checkout
+*.sh text eol=lf
+*.toml text eol=lf
+*.csv text eol=lf
+*.npz binary
+*.fits binary
+*.fit binary
+*.fz binary
+*.png binary

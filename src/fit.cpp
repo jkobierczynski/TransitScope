@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 #include <fstream>
 #include <numeric>
 #include <random>
@@ -57,7 +58,7 @@ FitResult fit_transit(const std::vector<double>& t, const std::vector<double>& f
               p[INC] <= 90 && p[LNF] > -1 && p[LNF] < 2))
             return -INFINITY;
         if (!(p[U1] + p[U2] > 0 && p[U1] + p[U2] < 1 && p[U1] > 0)) return -INFINITY;
-        if (p[A] * std::cos(p[INC] * M_PI / 180) > 1 + p[RP]) return -INFINITY;
+        if (p[A] * std::cos(p[INC] * std::numbers::pi / 180) > 1 + p[RP]) return -INFINITY;
         double lp = -0.5 * (std::pow((p[U1] - cfg.u1.mu) / cfg.u1.sigma, 2) + std::pow((p[U2] - cfg.u2.mu) / cfg.u2.sigma, 2));
         if (constrained)
             lp += -0.5 * std::pow((p[A] - cfg.a.mu) / cfg.a.sigma, 2) - 0.5 * std::pow((p[INC] - cfg.inc.mu) / cfg.inc.sigma, 2);
@@ -117,7 +118,7 @@ FitResult fit_transit(const std::vector<double>& t, const std::vector<double>& f
     R.beta = std::max(1.0, betas[betas.size() / 2]);
     R.tc_err_inflated_min = 0.5 * (R.q[TC].lo + R.q[TC].hi) * R.beta * 1440.0;
     std::vector<double> depth, bb;
-    for (const auto& s : ch) { depth.push_back(s[RP] * s[RP]); bb.push_back(s[A] * std::cos(s[INC] * M_PI / 180)); }
+    for (const auto& s : ch) { depth.push_back(s[RP] * s[RP]); bb.push_back(s[A] * std::cos(s[INC] * std::numbers::pi / 180)); }
     auto med = [](std::vector<double> v) { std::sort(v.begin(), v.end()); const size_t n = v.size(); return n % 2 ? v[n / 2] : 0.5 * (v[n / 2 - 1] + v[n / 2]); };
     R.depth_pct = med(depth) * 100;
     R.b = med(bb);

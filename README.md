@@ -1,5 +1,7 @@
 # TransitScope
 
+[![CI](https://github.com/jkobierczynski/transitscope/actions/workflows/ci.yml/badge.svg)](https://github.com/jkobierczynski/transitscope/actions/workflows/ci.yml)
+
 C++20 exoplanet-transit photometry: calibration → aperture photometry → BJD_TDB timing → comparison-star ensemble light curve → passband limb darkening → MCMC transit fit. No Java, no Python at runtime.
 
 Status: **milestone 5** — the full chain from raw frames to a fitted transit runs in C++, regression-tested stage by stage against the Python reference on the 2014-09-27 HD 189733 b data set. Two interchangeable image backends: CFITSIO and libxisfconv.
@@ -8,8 +10,13 @@ Status: **milestone 5** — the full chain from raw frames to a fitted transit r
 
 ```sh
 # Debian/Ubuntu: apt install cmake g++ pkg-config libcfitsio-dev liberfa-dev
+# macOS:         brew install cmake pkg-config cfitsio erfa
+# Windows:       MSYS2 UCRT64 shell: pacman -S mingw-w64-ucrt-x86_64-{gcc,cmake,ninja,pkgconf,cfitsio}
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
+
+# no ERFA package (e.g. MSYS2): CMake builds liberfa 2.0.1 from source by itself;
+# -DTRANSIT_ERFA_FROM_SOURCE=ON forces that also where a system ERFA exists
 
 # with the libxisfconv backend as well (https://github.com/jkobierczynski/xisfconv, >= 0.25; static or shared build)
 PKG_CONFIG_PATH=$XISFCONV_PREFIX/lib/pkgconfig cmake -S . -B build -DTRANSIT_WITH_XISFCONV=ON
@@ -18,7 +25,8 @@ PKG_CONFIG_PATH=$XISFCONV_PREFIX/lib/pkgconfig cmake -S . -B build -DTRANSIT_WIT
 ## Desktop application
 
 ```sh
-# Debian/Ubuntu: apt install qt6-base-dev   (Qt 6.2 or later)
+# Qt 6.2 or later: apt install qt6-base-dev | brew install qt (add -DCMAKE_PREFIX_PATH=$(brew --prefix qt))
+#                  | MSYS2: pacman -S mingw-w64-ucrt-x86_64-qt6-base
 cmake -S . -B build -DTRANSIT_WITH_GUI=ON && cmake --build build -j
 build/transitscope-gui myproject.toml
 ```
@@ -243,6 +251,22 @@ unselected star is excluded or the photometry changes slightly (flux noise of 1e
 `tests/unit/reduce_api_test` and `tests/unit/fit_api_test` check progress reporting, cancelling,
 that a callback or the thread count does not change results, and the in-memory tables against the
 CSV round trips (both clean under ThreadSanitizer).
+
+## Continuous integration
+
+`.github/workflows/ci.yml` builds the library, the CLI, the desktop application and the tests on
+Linux (GCC with the system ERFA, and Clang with ERFA built from source), macOS (Apple Clang,
+Homebrew) and Windows (MSYS2 UCRT64), and runs `tests/ci_checks.sh`. That script needs no image
+data: it starts from the Python reference photometry in `tests/reference` and checks the
+project file, the ensemble light curve (identical to the reference), the MCMC fit against emcee,
+the limb-darkening calculation, the fit API, the stability of the comparison selection and, where
+`batman-package` installs, the transit model. Run it locally with `tests/ci_checks.sh build`.
+The checks on the frames themselves (`reduce_api_test`, `gui_test`, `run_end_to_end.sh`) need the
+test data set and are run by hand.
+
+The MCMC chain for a given seed is the same on every run and thread count, but differs between
+C++ standard libraries (libstdc++ / libc++ / MSVC draw their normal deviates differently); the
+results agree within the tolerance of `compare_fit.py` (0.2 σ).
 
 ## Regression tests
 

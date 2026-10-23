@@ -3,10 +3,15 @@
 #include <QApplication>
 #include <QCommandLineParser>
 
+#include <clocale>
+
 #include "MainWindow.h"
 
 int main(int argc, char** argv) {
     QApplication app(argc, argv);
+    // QApplication adopts the user's locale for the C library; with a decimal comma (nl_BE, fr_BE,
+    // de_DE...) strtod/stod would stop at the '.' of every number in the CSV files and FITS headers.
+    std::setlocale(LC_NUMERIC, "C");
     QApplication::setApplicationName("TransitScope");
     QApplication::setOrganizationName("TransitScope");
     QApplication::setApplicationVersion(TRANSITSCOPE_VERSION);

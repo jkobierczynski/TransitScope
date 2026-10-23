@@ -3,6 +3,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <numbers>
 #include <complex>
 #include <numeric>
 #include <random>
@@ -21,7 +22,7 @@ void fft(std::vector<std::complex<double>>& a, bool inverse) {
         if (i < j) std::swap(a[i], a[j]);
     }
     for (size_t len = 2; len <= n; len <<= 1) {
-        const double ang = 2 * M_PI / len * (inverse ? 1 : -1);
+        const double ang = 2 * std::numbers::pi / len * (inverse ? 1 : -1);
         const std::complex<double> wl(std::cos(ang), std::sin(ang));
         for (size_t i = 0; i < n; i += len) {
             std::complex<double> w(1);

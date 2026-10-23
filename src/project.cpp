@@ -26,16 +26,19 @@ namespace transit {
 
 std::string Project::resolve(const std::string& p) const {
     if (p.empty()) return p;
+    // forward slashes on every system (Windows accepts them), so paths compare and print alike
     if (p == "~" || p.rfind("~/", 0) == 0) {
         const char* home = std::getenv("HOME");
-        if (home) return (fs::path(home) / p.substr(p.size() > 1 ? 2 : 1)).string();
+        if (!home || !*home) home = std::getenv("USERPROFILE");
+        if (home) return (fs::path(home) / p.substr(p.size() > 1 ? 2 : 1)).lexically_normal().generic_string();
     }
     const fs::path q(p);
-    if (q.is_absolute() || base_dir.empty()) return q.string();
-    return (fs::path(base_dir) / q).lexically_normal().string();
+    // "/data/x" counts as given on Windows too (rooted, without a drive letter)
+    if (q.is_absolute() || q.has_root_directory() || base_dir.empty()) return q.generic_string();
+    return (fs::path(base_dir) / q).lexically_normal().generic_string();
 }
 
-std::string Project::output(const std::string& file) const { return (fs::path(resolve(output_dir)) / file).string(); }
+std::string Project::output(const std::string& file) const { return (fs::path(resolve(output_dir)) / file).generic_string(); }
 
 // --------------------------------------------------------------------------------------------
 // reading
@@ -376,8 +379,8 @@ Project load_project(const std::string& path) {
     std::stringstream ss;
     ss << in.rdbuf();
     const fs::path abs = fs::absolute(path);
-    Project p = parse_project(ss.str(), abs.parent_path().string());
-    p.path = abs.string();
+    Project p = parse_project(ss.str(), abs.parent_path().generic_string());
+    p.path = abs.generic_string();
     return p;
 }
 
@@ -422,9 +425,10 @@ std::string list(const std::vector<T>& v) {
 }
 // a number of degrees stays a number, a sexagesimal string a string
 std::string angle(const std::string& s) {
-    double v;
-    auto r = std::from_chars(s.data(), s.data() + s.size(), v);
-    return r.ec == std::errc() && r.ptr == s.data() + s.size() ? num(v) : str(s);
+    // strtod rather than from_chars: floating-point from_chars is missing from older libc++ (macOS)
+    char* end = nullptr;
+    const double v = s.empty() ? 0 : std::strtod(s.c_str(), &end);
+    return !s.empty() && end == s.c_str() + s.size() ? num(v) : str(s);
 }
 
 }  // namespace
@@ -493,7 +497,13 @@ void save_project(const std::string& path, const Project& p) {
         o << project_to_toml(p);
         if (!o) throw std::runtime_error("error writing " + tmp);
     }
-    fs::rename(tmp, path);   // a crash while saving never leaves a half-written project
+    // a crash while saving never leaves a half-written project
+    std::error_code ec;
+    fs::rename(tmp, path, ec);
+    if (ec) {   // some Windows runtimes do not replace an existing file
+        fs::remove(path);
+        fs::rename(tmp, path);
+    }
 }
 
 std::string project_template() {

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.20)
-project(transitscope VERSION 0.10.0 LANGUAGES CXX)
+project(transitscope VERSION 0.10.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,7 +15,36 @@ if(NOT TRANSIT_WITH_CFITSIO AND NOT TRANSIT_WITH_XISFCONV)
 endif()
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(ERFA REQUIRED IMPORTED_TARGET erfa)
+
+# ERFA: the system library if pkg-config finds it, otherwise built from the liberfa sources
+# (fetched at configure time; needed on Windows/MSYS2, which has no ERFA package)
+option(TRANSIT_ERFA_FROM_SOURCE "Always build ERFA from source instead of using the system library" OFF)
+if(NOT TRANSIT_ERFA_FROM_SOURCE)
+  pkg_check_modules(ERFA IMPORTED_TARGET erfa)
+endif()
+if(TARGET PkgConfig::ERFA)
+  set(TRANSIT_ERFA_TARGET PkgConfig::ERFA)
+else()
+  message(STATUS "ERFA: building liberfa 2.0.1 from source")
+  enable_language(C)
+  include(FetchContent)
+  FetchContent_Declare(liberfa
+    GIT_REPOSITORY https://github.com/liberfa/erfa.git
+    GIT_TAG 9915ba38c9365f8b0738269b8c2ac1fdd5f8dee3   # v2.0.1
+    SOURCE_SUBDIR no-cmake)   # liberfa has no CMakeLists.txt: only download it, build it below
+  FetchContent_MakeAvailable(liberfa)
+  file(GLOB ERFA_SOURCES ${liberfa_SOURCE_DIR}/src/*.c)
+  list(FILTER ERFA_SOURCES EXCLUDE REGEX "/t_erfa_c")
+  add_library(erfa_bundled STATIC ${ERFA_SOURCES})
+  target_include_directories(erfa_bundled PUBLIC ${liberfa_SOURCE_DIR}/src)
+  target_compile_definitions(erfa_bundled PRIVATE PACKAGE_VERSION="2.0.1" PACKAGE_VERSION_MAJOR=2
+                             PACKAGE_VERSION_MINOR=0 PACKAGE_VERSION_MICRO=1 SOFA_VERSION="20231011")
+  set_target_properties(erfa_bundled PROPERTIES POSITION_INDEPENDENT_CODE ON)
+  if(UNIX)
+    target_link_libraries(erfa_bundled PUBLIC m)
+  endif()
+  set(TRANSIT_ERFA_TARGET erfa_bundled)
+endif()
 
 add_library(transit
   src/image.cpp
@@ -38,7 +67,7 @@ target_include_directories(transit PUBLIC include)
 target_include_directories(transit SYSTEM PRIVATE third_party/tomlplusplus)
 target_compile_definitions(transit PRIVATE TRANSIT_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
 find_package(Threads REQUIRED)
-target_link_libraries(transit PUBLIC PkgConfig::ERFA Threads::Threads)
+target_link_libraries(transit PUBLIC ${TRANSIT_ERFA_TARGET} Threads::Threads)
 target_compile_options(transit PRIVATE -Wall -Wextra -Wpedantic)
 
 if(TRANSIT_WITH_CFITSIO)
