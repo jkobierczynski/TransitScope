@@ -116,14 +116,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
     problemsDock->raise();
 
     // menus
+    // menu entries as addAction(text, receiver, slot) + setShortcut: the form every Qt 6 version has
     auto* file = menuBar()->addMenu(tr("&File"));
-    file->addAction(tr("&New project"), QKeySequence::New, this, &MainWindow::newProject);
-    file->addAction(tr("&Open…"), QKeySequence::Open, this, &MainWindow::openDialog);
+    file->addAction(tr("&New project"), this, &MainWindow::newProject)->setShortcut(QKeySequence::New);
+    file->addAction(tr("&Open…"), this, &MainWindow::openDialog)->setShortcut(QKeySequence::Open);
     recentMenu_ = file->addMenu(tr("Open &recent"));
-    file->addAction(tr("&Save"), QKeySequence::Save, this, &MainWindow::save);
-    file->addAction(tr("Save &as…"), QKeySequence::SaveAs, this, &MainWindow::saveAs);
+    file->addAction(tr("&Save"), this, &MainWindow::save)->setShortcut(QKeySequence::Save);
+    file->addAction(tr("Save &as…"), this, &MainWindow::saveAs)->setShortcut(QKeySequence::SaveAs);
     file->addSeparator();
-    file->addAction(tr("&Quit"), QKeySequence::Quit, this, &QWidget::close);
+    file->addAction(tr("&Quit"), this, &QWidget::close)->setShortcut(QKeySequence::Quit);
     auto* stars = menuBar()->addMenu(tr("&Stars"));
     stars->addAction(tr("&Detect stars on the reference frame"), this, &MainWindow::detectStars);
     stars->addAction(tr("&Fit image in window"), image_, &ImageView::fitInView);

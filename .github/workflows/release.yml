@@ -106,8 +106,11 @@ jobs:
           test -f "$app/PlugIns/platforms/libqcocoa.dylib"
           "$app/MacOS/transitscope" ld --teff 5050 --logg 4.59 --feh -0.03 | tail -1
           "$app/MacOS/transitscope-gui" --version     # the runner has a desktop session (Cocoa)
-          otool -L "$app/MacOS/transitscope" | grep -v -e '@executable_path' -e '@rpath' -e /usr/lib -e /System \
-            | tail -n +2 | grep . && { echo "::error::CLI links outside the bundle"; exit 1; } || true
+          # every library the CLI loads must be in the bundle (@loader_path, @executable_path, @rpath)
+          # or part of macOS (/usr/lib, /System)
+          outside=$(otool -L "$app/MacOS/transitscope" | tail -n +2 | awk '{print $1}' \
+            | grep -v -e '^@loader_path/' -e '^@executable_path/' -e '^@rpath/' -e '^/usr/lib/' -e '^/System/' || true)
+          if [ -n "$outside" ]; then echo "::error::the CLI links outside the bundle: $outside"; exit 1; fi
           hdiutil detach /Volumes/ts
       - uses: actions/upload-artifact@v4
         with:
