@@ -5,6 +5,14 @@
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
+
+#if defined(_WIN32)
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <mach-o/dyld.h>
+#endif
 #include <fstream>
 #include <limits>
 #include <numeric>
@@ -59,13 +67,45 @@ double Curve::at(double lambda_nm) const {
     return interp_xy(nm, y, lambda_nm);
 }
 
+namespace {
+// folder of the running program (empty if unknown), for the data folder of an installed copy
+std::filesystem::path executable_dir() {
+#if defined(_WIN32)
+    std::wstring buf(32768, L'\0');
+    const DWORD n = GetModuleFileNameW(nullptr, buf.data(), DWORD(buf.size()));
+    if (n == 0 || n >= buf.size()) return {};
+    buf.resize(n);
+    return std::filesystem::path(buf).parent_path();
+#elif defined(__APPLE__)
+    uint32_t size = 0;
+    _NSGetExecutablePath(nullptr, &size);
+    std::string buf(size, '\0');
+    if (_NSGetExecutablePath(buf.data(), &size) != 0) return {};
+    std::error_code ec;
+    const auto p = std::filesystem::canonical(buf.c_str(), ec);
+    return ec ? std::filesystem::path() : p.parent_path();
+#else
+    std::error_code ec;
+    const auto p = std::filesystem::read_symlink("/proc/self/exe", ec);
+    return ec ? std::filesystem::path() : p.parent_path();
+#endif
+}
+}  // namespace
+
 std::string find_data_file(const std::string& name, const std::string& sub) {
     namespace fs = std::filesystem;
     if (fs::exists(name)) return name;
     std::vector<std::string> bases;
     if (const char* env = std::getenv("TRANSIT_DATA_DIR")) bases.emplace_back(env);
+    // an installed or packaged copy: <prefix>/bin/../share/transitscope/data, a macOS bundle's
+    // Contents/MacOS/../Resources/data, or data/ next to the program
+    if (const fs::path exe = executable_dir(); !exe.empty())
+        for (const char* rel : {"../share/transitscope/data", "../Resources/data", "data"}) {
+            const fs::path d = (exe / rel).lexically_normal();
+            if (fs::is_directory(d)) bases.push_back(d.string());
+        }
 #ifdef TRANSIT_DATA_DIR
-    bases.emplace_back(TRANSIT_DATA_DIR);
+    bases.emplace_back(TRANSIT_DATA_DIR);   // the source tree, for a build that is not installed
 #endif
     bases.emplace_back("data");
     std::string looked;

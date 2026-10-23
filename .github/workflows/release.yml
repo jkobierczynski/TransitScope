@@ -1,0 +1,194 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Binary release on a version tag (git tag v0.11.0 && git push origin v0.11.0): builds and checks on
+# Linux, macOS and Windows, packages self-contained programs and publishes them as a GitHub release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build a release for (e.g. v0.11.0)"
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  version:
+    name: Tag matches the project version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+      - id: v
+        run: |
+          version=$(sed -n 's/^project(transitscope VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)
+          echo "CMakeLists.txt: $version, tag: $TAG"
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::tag $TAG does not match project version $version in CMakeLists.txt"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  linux:
+    name: Linux x86-64 (AppImage + tarball)
+    needs: version
+    runs-on: ubuntu-22.04          # glibc 2.35: also runs on Debian 12, Ubuntu 22.04 and newer
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build g++ pkg-config file \
+            libcfitsio-dev liberfa-dev qt6-base-dev qmake6 libgl1-mesa-dev python3-numpy
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSIT_WITH_GUI=ON
+          cmake --build build
+      - name: Checks
+        run: bash tests/ci_checks.sh build
+      - name: Package
+        run: bash packaging/package-linux.sh build ${{ needs.version.outputs.version }} dist
+      - name: Packaged programs start
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          mkdir t && tar -xzf dist/transitscope-*-linux-x86_64.tar.gz -C t
+          t/*/bin/transitscope ld --teff 5050 --logg 4.59 --feh -0.03 | tail -1
+          t/*/bin/transitscope-gui --version
+          APPIMAGE_EXTRACT_AND_RUN=1 dist/TransitScope-*-x86_64.AppImage --version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*
+
+  macos:
+    name: macOS arm64 (dmg)
+    needs: version
+    runs-on: macos-15             # Homebrew's libraries target the runner's macOS: needs macOS 15 or newer
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: |
+          brew install ninja pkg-config cfitsio qt
+          brew install erfa || echo "no ERFA formula: it is built from source"
+          python -m pip install numpy
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSIT_WITH_GUI=ON \
+            -DCMAKE_PREFIX_PATH="$(brew --prefix qt)"
+          cmake --build build
+      - name: Checks
+        env:
+          PYTHON: python
+        run: bash tests/ci_checks.sh build
+      - name: Package
+        run: bash packaging/package-macos.sh build ${{ needs.version.outputs.version }} dist
+      - name: Packaged programs start
+        run: |
+          hdiutil attach dist/TransitScope-*.dmg -mountpoint /Volumes/ts
+          app=/Volumes/ts/TransitScope.app/Contents
+          test -f "$app/PlugIns/platforms/libqcocoa.dylib"
+          "$app/MacOS/transitscope" ld --teff 5050 --logg 4.59 --feh -0.03 | tail -1
+          "$app/MacOS/transitscope-gui" --version     # the runner has a desktop session (Cocoa)
+          otool -L "$app/MacOS/transitscope" | grep -v -e '@executable_path' -e '@rpath' -e /usr/lib -e /System \
+            | tail -n +2 | grep . && { echo "::error::CLI links outside the bundle"; exit 1; } || true
+          hdiutil detach /Volumes/ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*
+
+  windows:
+    name: Windows x86-64 (zip)
+    needs: version
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git zip
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-pkgconf
+            mingw-w64-ucrt-x86_64-cfitsio
+            mingw-w64-ucrt-x86_64-qt6-base
+            mingw-w64-ucrt-x86_64-python
+            mingw-w64-ucrt-x86_64-python-numpy
+      - name: Build
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSIT_WITH_GUI=ON
+          cmake --build build
+      - name: Checks
+        env:
+          PYTHON: python
+        run: bash tests/ci_checks.sh build
+      - name: Package
+        run: bash packaging/package-windows.sh build ${{ needs.version.outputs.version }} dist
+      - name: Packaged program starts outside MSYS2
+        shell: pwsh
+        run: |
+          Expand-Archive dist/transitscope-*-windows-x86_64.zip -DestinationPath t
+          $env:PATH = "C:\Windows\System32;C:\Windows"   # no MSYS2 DLLs on the path
+          $exe = Get-ChildItem t -Recurse -Filter transitscope.exe | Select-Object -First 1
+          & $exe.FullName ld --teff 5050 --logg 4.59 --feh -0.03
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*
+
+  release:
+    name: GitHub release
+    needs: [version, linux, macos, windows]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: TransitScope ${{ needs.version.outputs.version }}
+          draft: false
+          generate_release_notes: true
+          files: dist/*
+          body: |
+            **Downloads**
+            - **Linux x86-64**: `TransitScope-…-x86_64.AppImage` (desktop application: `chmod +x` and run), or the
+              `…-linux-x86_64.tar.gz` with both programs (`bin/transitscope`, `bin/transitscope-gui`).
+              Built on Ubuntu 22.04; runs on Debian 12 / Ubuntu 22.04 and newer.
+            - **macOS 15 or newer, Apple silicon**: `TransitScope-…-macos-arm64.dmg`. Not notarized: the first time,
+              right-click the app and choose *Open* (or `xattr -dr com.apple.quarantine /Applications/TransitScope.app`).
+              The command line is `TransitScope.app/Contents/MacOS/transitscope`.
+            - **Windows x86-64**: `transitscope-…-windows-x86_64.zip`; unzip and run `bin\transitscope-gui.exe`
+              (or `bin\transitscope.exe` in a terminal). Not code-signed: SmartScreen may ask to confirm.
+
+            Test data: see *Test data* in the README. `SHA256SUMS.txt` lists the checksums.

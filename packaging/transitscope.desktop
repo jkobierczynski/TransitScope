@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=TransitScope
+GenericName=Exoplanet transit photometry
+Comment=Calibrate, measure and fit exoplanet transit light curves
+Exec=transitscope-gui %f
+Icon=transitscope
+Categories=Science;Astronomy;Education;
+MimeType=application/toml;
+Terminal=false

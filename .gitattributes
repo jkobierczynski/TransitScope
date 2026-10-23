@@ -7,3 +7,6 @@
 *.fit binary
 *.fz binary
 *.png binary
+*.ico binary
+*.icns binary
+*.AppImage binary

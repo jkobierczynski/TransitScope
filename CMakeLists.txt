@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.20)
-project(transitscope VERSION 0.10.3 LANGUAGES CXX)
+project(transitscope VERSION 0.11.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -120,6 +120,13 @@ endif()
 add_executable(transitscope tools/transitscope.cpp)
 target_link_libraries(transitscope PRIVATE transit)
 
+include(GNUInstallDirs)
+install(TARGETS transitscope RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+# limb-darkening tables and passbands, found by the programs at <prefix>/share/transitscope/data
+install(DIRECTORY data/ DESTINATION ${CMAKE_INSTALL_DATADIR}/transitscope/data)
+install(FILES README.md LICENSE DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/transitscope)
+install(DIRECTORY examples/ DESTINATION ${CMAKE_INSTALL_DATADIR}/doc/transitscope/examples)
+
 add_executable(fitscompare tools/fitscompare.cpp)
 target_link_libraries(fitscompare PRIVATE transit)
 
@@ -142,13 +149,32 @@ option(TRANSIT_WITH_GUI "Build the Qt 6 desktop application transitscope-gui" OF
 if(TRANSIT_WITH_GUI)
   find_package(Qt6 6.2 REQUIRED COMPONENTS Widgets Concurrent)
   set(CMAKE_AUTOMOC ON)
-  add_executable(transitscope-gui
-    gui/main.cpp gui/MainWindow.cpp gui/SettingsEditor.cpp gui/ImageView.cpp gui/PlotWidget.cpp gui/ResultsView.cpp)
+  set(GUI_SOURCES gui/main.cpp gui/MainWindow.cpp gui/SettingsEditor.cpp gui/ImageView.cpp gui/PlotWidget.cpp
+                  gui/ResultsView.cpp)
+  if(WIN32)
+    list(APPEND GUI_SOURCES packaging/transitscope.rc)               # the .exe icon
+  elseif(APPLE)
+    list(APPEND GUI_SOURCES packaging/transitscope.icns)
+    set_source_files_properties(packaging/transitscope.icns PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+  endif()
+  # a Windows GUI program (no console window) and a macOS application bundle
+  add_executable(transitscope-gui WIN32 MACOSX_BUNDLE ${GUI_SOURCES})
+  set_target_properties(transitscope-gui PROPERTIES
+    MACOSX_BUNDLE_BUNDLE_NAME TransitScope
+    MACOSX_BUNDLE_GUI_IDENTIFIER io.github.jkobierczynski.transitscope
+    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
+    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION}
+    MACOSX_BUNDLE_ICON_FILE transitscope.icns)
+  qt_add_resources(transitscope-gui "icon" PREFIX "/" BASE packaging FILES packaging/transitscope.png)
   target_include_directories(transitscope-gui SYSTEM PRIVATE third_party/tomlplusplus)
   target_compile_definitions(transitscope-gui PRIVATE TRANSITSCOPE_VERSION="${PROJECT_VERSION}")
   target_link_libraries(transitscope-gui PRIVATE transit Qt6::Widgets Qt6::Concurrent)
   target_compile_options(transitscope-gui PRIVATE -Wall -Wextra)
-  install(TARGETS transitscope-gui RUNTIME DESTINATION bin)
+  install(TARGETS transitscope-gui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} BUNDLE DESTINATION .)
+  if(UNIX AND NOT APPLE)
+    install(FILES packaging/transitscope.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+    install(FILES packaging/transitscope.png DESTINATION ${CMAKE_INSTALL_DATADIR}/icons/hicolor/256x256/apps)
+  endif()
 
   find_package(Qt6 COMPONENTS Test)
   if(Qt6Test_FOUND)

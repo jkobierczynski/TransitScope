@@ -84,7 +84,7 @@ QString describeStage(Stage s) {
 }  // namespace
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent) {
-    setWindowIcon(QIcon::fromTheme("applications-science"));
+    setWindowIcon(QIcon(":/transitscope.png"));
     settings_ = new SettingsEditor;
     image_ = new ImageView;
     results_ = new ResultsView;

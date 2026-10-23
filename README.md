@@ -252,6 +252,30 @@ unselected star is excluded or the photometry changes slightly (flux noise of 1e
 that a callback or the thread count does not change results, and the in-memory tables against the
 CSV round trips (both clean under ThreadSanitizer).
 
+## Releases
+
+Pushing a version tag builds, checks and packages TransitScope on all three systems and publishes
+a GitHub release (`.github/workflows/release.yml`):
+
+```sh
+# set project(transitscope VERSION 0.11.0) in CMakeLists.txt first: the workflow checks they match
+git tag v0.11.0 && git push origin v0.11.0
+```
+
+| system | download | contents |
+|---|---|---|
+| Linux x86-64 (Debian 12 / Ubuntu 22.04 and newer) | `TransitScope-0.11.0-x86_64.AppImage` | desktop application |
+| | `transitscope-0.11.0-linux-x86_64.tar.gz` | `bin/transitscope`, `bin/transitscope-gui` with their libraries |
+| macOS 15+, Apple silicon | `TransitScope-0.11.0-macos-arm64.dmg` | `TransitScope.app` (the CLI is `Contents/MacOS/transitscope`) |
+| Windows x86-64 | `transitscope-0.11.0-windows-x86_64.zip` | `bin\transitscope-gui.exe`, `bin\transitscope.exe` with their DLLs |
+
+Each package carries the libraries it needs (made with linuxdeploy, macdeployqt and the MSYS2
+DLLs) and the data files; nothing else has to be installed. The programs find their data next to
+themselves (`share/transitscope/data`, or `Contents/Resources/data` in the app). The macOS app is
+signed ad hoc but not notarized, and the Windows programs are not code-signed, so the first start
+needs a confirmation. A release can also be rebuilt for an existing tag from the Actions tab
+(*Release → Run workflow*). The packaging scripts are in `packaging/`.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` builds the library, the CLI, the desktop application and the tests on
