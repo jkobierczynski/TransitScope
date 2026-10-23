@@ -1,6 +1,6 @@
 # TransitScope
 
-[![CI](https://github.com/jkobierczynski/transitscope/actions/workflows/ci.yml/badge.svg)](https://github.com/jkobierczynski/transitscope/actions/workflows/ci.yml)
+[![CI](https://github.com/jkobierczynski/TransitScope/actions/workflows/ci.yml/badge.svg)](https://github.com/jkobierczynski/TransitScope/actions/workflows/ci.yml)
 
 C++20 exoplanet-transit photometry: calibration → aperture photometry → BJD_TDB timing → comparison-star ensemble light curve → passband limb darkening → MCMC transit fit. No Java, no Python at runtime.
 

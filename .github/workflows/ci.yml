@@ -23,7 +23,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends cmake ninja-build g++ pkg-config \
             libcfitsio-dev liberfa-dev qt6-base-dev python3-numpy python3-pip
-          pip install --break-system-packages batman-package
+          sudo pip install --break-system-packages batman-package   # system-wide: the checks run python -I
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DTRANSIT_WITH_GUI=ON
       - name: Build

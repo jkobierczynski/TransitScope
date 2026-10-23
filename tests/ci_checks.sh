@@ -40,7 +40,7 @@ step "fit API: progress, cancelling, in-memory data, thread count"
 step "comparison-star selection stability"
 "$B/comp_stability_test" "$W/phot_ref.csv"
 
-if "$PY" -c "import batman" 2>/dev/null; then
+if "$PY" -I -c "import batman" 2>/dev/null; then   # -I as below: user site-packages do not count
   step "transit model vs batman"
   "$PY" -I "$HERE/unit/check_model_vs_batman.py" "$B/model_dump"
 else
