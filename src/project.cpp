@@ -7,6 +7,8 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <map>
+#include <optional>
 #include <type_traits>
 #include <ostream>
 #include <set>
@@ -16,6 +18,8 @@
 #include <toml.hpp>
 
 #include "transit/calib.h"
+#include "transit/diagnostics.h"
+#include "transit/provenance.h"
 
 namespace fs = std::filesystem;
 
@@ -711,22 +715,51 @@ void run_project(const Project& p, const RunOptions& opt, const StageProgress& p
     fs::create_directories(p.resolve(p.output_dir));
     const Masters m = master_paths(p);
     const auto& f = p.frames;
+    const std::string settings = project_to_toml(p);
+    // provenance/<stage>.json: build, times, settings, size + SHA-256 of every input and output
+    auto record = [&](Stage s, const std::string& started, const std::vector<std::pair<std::string, std::string>>& in,
+                      const std::vector<std::pair<std::string, std::string>>& out) {
+        ProvenanceRecord r;
+        r.stage = stage_name(s);
+        r.started_utc = started;
+        r.finished_utc = utc_now_iso();
+        r.project_file = p.path;
+        r.build = build_info();
+        r.settings_toml = settings;
+        r.inputs = digest_files(in, p.reduce.threads);
+        r.outputs = digest_files(out, p.reduce.threads);
+        write_provenance(provenance_path(p, s), r);
+        uint64_t bytes = 0;
+        for (const auto& d : r.inputs) bytes += d.size;
+        std::ostringstream msg;
+        msg.precision(2);
+        msg << std::fixed << "provenance: " << r.inputs.size() << " inputs (" << bytes / 1e9 << " GB) and "
+            << r.outputs.size() << " outputs hashed -> " << provenance_path(p, s);
+        log(msg.str());
+    };
+    using Files = std::vector<std::pair<std::string, std::string>>;
 
     if (on(Stage::Masters)) {
+        const std::string started = utc_now_iso();
+        Files in, out;
         const std::string lights = p.resolve(f.lights_dir);
-        auto build = [&](const char* type, const std::string& dir, const std::string& out, const std::string& bias) {
+        auto build = [&](const char* type, const std::string& dir, const std::string& outfile, const std::string& bias) {
             const auto files = find_calibration_frames(p.resolve(dir), type, lights);
             if (files.empty()) throw std::runtime_error(std::string("no ") + type + " frames in " + p.resolve(dir));
             const Image img = build_master(f.backend, type, files, bias, cb(Stage::Masters));
-            write_master(out, img, type, files.size());
-            log(std::string("master ") + type + ": " + std::to_string(files.size()) + " frames -> " + out);
+            write_master(outfile, img, type, files.size());
+            log(std::string("master ") + type + ": " + std::to_string(files.size()) + " frames -> " + outfile);
+            for (const auto& fr : files) in.emplace_back(type, fr);
+            out.emplace_back(std::string("master_") + type, outfile);
         };
         if (f.master_bias.empty() && !f.bias_dir.empty()) build("bias", f.bias_dir, m.bias, "");
         if (f.master_dark.empty()) build("dark", f.darks_dir, m.dark, "");
         if (f.master_flat.empty()) build("flat", f.flats_dir, m.flat, m.bias);
+        if (!out.empty()) record(Stage::Masters, started, in, out);
     }
 
     if (on(Stage::Reduce)) {
+        const std::string started = utc_now_iso();
         ReduceConfig rc = p.reduce;
         rc.lights = find_light_frames(p.resolve(f.lights_dir), f.lights_prefix);
         if (rc.lights.empty())
@@ -737,9 +770,17 @@ void run_project(const Project& p, const RunOptions& opt, const StageProgress& p
         write_phot_csv(p.output("phot.csv"), r);
         log("reduce: " + std::to_string(r.frames.size()) + " frames, " + std::to_string(r.stars.size()) + " stars -> " +
             p.output("phot.csv"));
+        Files in;
+        for (const auto& l : rc.lights) in.emplace_back("light", l);
+        in.emplace_back("master_dark", m.dark);
+        in.emplace_back("master_flat", m.flat);
+        if (!m.bias.empty() && fs::exists(m.bias)) in.emplace_back("master_bias", m.bias);
+        if (!p.stars_file.empty()) in.emplace_back("stars", p.resolve(p.stars_file));
+        record(Stage::Reduce, started, in, {{"phot", p.output("phot.csv")}});
     }
 
     if (on(Stage::LightCurve)) {
+        const std::string started = utc_now_iso();
         const PhotTable t = load_phot_csv(p.output("phot.csv"));
         const EnsembleResult lc = build_light_curve(t, p.lightcurve);
         write_light_curve_csv(p.output("lc.csv"), t, lc);
@@ -749,15 +790,19 @@ void run_project(const Project& p, const RunOptions& opt, const StageProgress& p
         s << "lightcurve: radius " << lc.radius << " px, " << lc.comps.size() << " comparison stars, " << good << "/" << t.nf
           << " good frames -> " << p.output("lc.csv");
         log(s.str());
+        record(Stage::LightCurve, started, {{"phot", p.output("phot.csv")}}, {{"lightcurve", p.output("lc.csv")}});
         if (progress && !progress(Stage::LightCurve, 1, 1)) throw Cancelled();
     }
 
     const bool passband = p.ld.mode == LdSettings::Mode::Passband;
     if (on(Stage::LimbDarkening) && passband) {
+        const std::string started = utc_now_iso();
+        const std::string tabf = find_data_file(p.ld.table, "ld"), filf = find_data_file(p.ld.filter, "passbands"),
+                          qef = find_data_file(p.ld.qe, "passbands");
         ClaretTable tab;
-        tab.load(find_data_file(p.ld.table, "ld"));
-        const Curve filter = load_curve_csv(find_data_file(p.ld.filter, "passbands"));
-        const Curve qe = load_curve_csv(find_data_file(p.ld.qe, "passbands"));
+        tab.load(tabf);
+        const Curve filter = load_curve_csv(filf);
+        const Curve qe = load_curve_csv(qef);
         const LdResult r = passband_limb_darkening(tab, p.ld.star, filter, qe, p.ld.cfg);
         write_ld_json(p.output("ld.json"), r, p.ld.star, p.ld.cfg);
         std::ostringstream s;
@@ -765,11 +810,21 @@ void run_project(const Project& p, const RunOptions& opt, const StageProgress& p
         s << std::fixed << "ld: u1 = " << r.u1 << " +- " << r.s1.total << ", u2 = " << r.u2 << " +- " << r.s2.total << " -> "
           << p.output("ld.json");
         log(s.str());
+        record(Stage::LimbDarkening, started, {{"ld_table", tabf}, {"filter", filf}, {"qe", qef}}, {{"ld", p.output("ld.json")}});
         if (progress && !progress(Stage::LimbDarkening, 1, 1)) throw Cancelled();
     }
 
     if (on(Stage::Fit)) {
+        const std::string started = utc_now_iso();
+        Files in{{"lightcurve", p.output("lc.csv")}}, out;
+        if (passband) in.emplace_back("ld", p.output("ld.json"));
         const FitData d = load_fit_data(p.output("lc.csv"));
+        // phot.csv supplies the per-frame quantities for the systematics diagnostics
+        std::optional<PhotTable> phot;
+        if (std::filesystem::exists(p.output("phot.csv"))) {
+            phot = load_phot_csv(p.output("phot.csv"));
+            in.emplace_back("phot", p.output("phot.csv"));
+        }
         for (FitConfig::Mode mode : p.fit_modes) {
             FitConfig fc = p.fit;
             fc.mode = mode;
@@ -783,8 +838,108 @@ void run_project(const Project& p, const RunOptions& opt, const StageProgress& p
             s << std::fixed << "fit " << name << ": Tc = " << r.q[0].med << " +- " << 0.5 * (r.q[0].lo + r.q[0].hi)
               << " BJD_TDB, Rp/Rs = " << std::setprecision(4) << r.q[1].med << " -> " << p.output("fit_" + name + ".json");
             log(s.str());
+            out.emplace_back("fit_" + name, p.output("fit_" + name + ".json"));
+            out.emplace_back("model_" + name, p.output("model_" + name + ".csv"));
+            try {
+                const FitCurves fcur = fit_curves(d.t, d.f, r, fc);
+                const Diagnostics dg = diagnose_fit(phot ? &*phot : nullptr, p.output("lc.csv"), d, fcur.residual,
+                                                    p.lightcurve.target);
+                write_diagnostics_json(p.output("diagnostics_" + name + ".json"), dg);
+                std::istringstream sum(diagnostics_summary(dg));
+                for (std::string line; std::getline(sum, line);) log("  " + line);
+                out.emplace_back("diagnostics_" + name, p.output("diagnostics_" + name + ".json"));
+            } catch (const std::exception& e) {
+                log(std::string("  diagnostics skipped: ") + e.what());
+            }
+        }
+        record(Stage::Fit, started, in, out);
+    }
+}
+
+std::string provenance_path(const Project& p, Stage s) { return p.output(std::string("provenance/") + stage_name(s) + ".json"); }
+
+VerifyReport verify_provenance(const Project& p, bool hash_frames) {
+    VerifyReport rep;
+    struct Rec { Stage stage; ProvenanceRecord r; };
+    std::vector<Rec> recs;
+    for (Stage s : {Stage::Masters, Stage::Reduce, Stage::LightCurve, Stage::LimbDarkening, Stage::Fit}) {
+        const std::string path = provenance_path(p, s);
+        if (!fs::exists(path)) {
+            rep.lines.push_back({VerifyReport::Info, std::string(stage_name(s)) + ": no record"});
+            continue;
+        }
+        try {
+            recs.push_back({s, read_provenance(path)});
+        } catch (const std::exception& e) {
+            rep.lines.push_back({VerifyReport::Problem, std::string(stage_name(s)) + ": " + e.what()});
         }
     }
+    auto is_frame = [](const std::string& role) { return role == "light" || role == "bias" || role == "dark" || role == "flat"; };
+    for (const auto& [stage, r] : recs) {
+        const std::string sn = stage_name(stage);
+        size_t checked = 0, size_only = 0, bad = 0;
+        auto check = [&](const FileDigest& d, bool output) {
+            std::error_code ec;
+            if (!fs::exists(d.path, ec)) {
+                rep.lines.push_back({VerifyReport::Problem, sn + ": " + (output ? "output " : "input ") + d.path + " is missing"});
+                ++bad;
+                return;
+            }
+            const uint64_t size = fs::file_size(d.path, ec);
+            const bool hash = hash_frames || !is_frame(d.role);
+            if (size != d.size || (hash && sha256_file(d.path) != d.sha256)) {
+                rep.lines.push_back({VerifyReport::Problem,
+                                     sn + ": " + (output ? "output " : "input ") + d.path + " has changed since the stage ran (" +
+                                         r.finished_utc + ")" + (output ? "" : ": rerun from " + sn)});
+                ++bad;
+            }
+            ++checked;
+            if (!hash) ++size_only;
+        };
+        for (const auto& d : r.inputs) check(d, false);
+        for (const auto& d : r.outputs) check(d, true);
+        if (!r.settings_toml.empty()) {
+            // only the sections this stage reads count
+            static const std::map<Stage, std::vector<std::string>> used = {
+                {Stage::Masters, {"frames"}},
+                {Stage::Reduce, {"target", "site", "frames", "reduce"}},
+                {Stage::LightCurve, {"ephemeris", "lightcurve", "camera", "site", "reduce"}},
+                {Stage::LimbDarkening, {"limb_darkening"}},
+                {Stage::Fit, {"ephemeris", "limb_darkening", "fit"}}};
+            auto section = [](const std::string& toml, const std::string& name) {
+                const std::string head = "[" + name + "]\n";
+                const size_t a = toml.find(head);
+                if (a == std::string::npos) return std::string();
+                const size_t b = toml.find("\n[", a + head.size());
+                return toml.substr(a, b == std::string::npos ? std::string::npos : b - a);
+            };
+            const std::string now = project_to_toml(p);
+            std::string changed;
+            for (const auto& sec : used.at(stage))
+                if (section(now, sec) != section(r.settings_toml, sec)) changed += (changed.empty() ? "[" : ", [") + sec + "]";
+            if (!changed.empty())
+                rep.lines.push_back({VerifyReport::Info, sn + ": settings in " + changed + " have changed since this stage ran"});
+        }
+        if (!bad)
+            rep.lines.push_back({VerifyReport::Ok, sn + ": " + std::to_string(checked) + " files as recorded (" + r.finished_utc +
+                                                       ", TransitScope " + r.build.version + ")" +
+                                                       (size_only ? ", " + std::to_string(size_only) + " frames by size only" : "")});
+    }
+    // chain: every input that an earlier stage produced must be the version that stage recorded
+    for (size_t i = 0; i < recs.size(); ++i)
+        for (size_t j = i + 1; j < recs.size(); ++j)
+            for (const auto& in : recs[j].r.inputs)
+                for (const auto& out : recs[i].r.outputs)
+                    if (in.path == out.path && in.sha256 != out.sha256)
+                        rep.lines.push_back({VerifyReport::Problem,
+                                             std::string(stage_name(recs[j].stage)) + " used a different " + in.path + " than " +
+                                                 stage_name(recs[i].stage) + " last wrote: rerun from " + stage_name(recs[j].stage)});
+    return rep;
+}
+
+bool VerifyReport::ok() const {
+    for (const auto& l : lines) if (l.kind == Problem) return false;
+    return true;
 }
 
 }  // namespace transit

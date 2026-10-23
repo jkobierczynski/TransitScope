@@ -11,12 +11,14 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QSplitter>
+#include <QTabWidget>
 #include <QTableWidget>
 #include <QTextStream>
 #include <QVBoxLayout>
 
 #include <cmath>
 
+#include "DiagnosticsView.h"
 #include "PlotWidget.h"
 
 namespace {
@@ -100,21 +102,32 @@ ResultsView::ResultsView(QWidget* parent) : QWidget(parent) {
     split->setSizes({860, 400});
     table_->setMinimumWidth(380);
 
+    diag_ = new DiagnosticsView;
+    tabs_ = new QTabWidget;
+    tabs_->addTab(split, tr("Light curve and fit"));
+    tabs_->addTab(diag_, tr("Diagnostics"));
+    tabs_->setDocumentMode(true);
+
     auto* lay = new QVBoxLayout(this);
     lay->addLayout(top);
-    lay->addWidget(split, 1);
+    lay->addWidget(tabs_, 1);
     connect(mode_, &QComboBox::currentIndexChanged, this, [this] { refresh(); });
     lc_->setMessage(tr("No results yet: run the project."));
     res_->setMessage(tr(" "));
 }
 
-void ResultsView::load(const QString& dir, double t14) {
+void ResultsView::showTab(int i) { tabs_->setCurrentIndex(i); }
+
+void ResultsView::load(const QString& dir, double t14, size_t target) {
     dir_ = dir;
     t14_ = t14;
+    target_ = target;
     refresh();
 }
 
 void ResultsView::refresh() {
+    diag_->load(dir_, mode_->currentText(), target_);
+    tabs_->setTabText(1, diag_->diagnostics().warnings.empty() ? tr("Diagnostics") : tr("Diagnostics ⚠"));
     lc_->clear();
     res_->clear();
     table_->setRowCount(0);

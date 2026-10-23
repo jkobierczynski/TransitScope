@@ -7,6 +7,8 @@
 #include <QVector>
 #include <QWidget>
 
+#include <cmath>
+
 class PlotWidget : public QWidget {
     Q_OBJECT
 public:
@@ -29,6 +31,8 @@ public:
     void linkX(PlotWidget* other);
     void setXRange(double x0, double x1, bool emitSignal = true);
     void resetZoom();
+    /// Logarithmic axes (values <= 0 are not drawn); ticks at 1, 2, 5 x 10^n.
+    void setLog(bool logX, bool logY);
 
     QSize minimumSizeHint() const override { return {240, 160}; }
 
@@ -44,6 +48,8 @@ protected:
 
 private:
     QRectF dataBounds() const;
+    double tx(double x) const { return logX_ ? (x > 0 ? std::log10(x) : NAN) : x; }   // data -> axis coordinate
+    double ty(double y) const { return logY_ ? (y > 0 ? std::log10(y) : NAN) : y; }
     QRect plotArea() const;
     void autoY();
 
@@ -55,6 +61,7 @@ private:
     QString title_, xlabel_, ylabel_, message_;
     double x0_ = 0, x1_ = 1, y0_ = 0, y1_ = 1;
     bool zoomed_ = false;
+    bool logX_ = false, logY_ = false;
     QPoint dragStart_, dragNow_;
     bool dragging_ = false;
 };

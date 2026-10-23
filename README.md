@@ -111,6 +111,48 @@ DATE-OBS:
 The planet name and filter in the header come from `[target] planet` and `[camera] filter_name`. The
 command prints what to choose in the upload form.
 
+### Red noise and systematics
+
+After each fit, `run` checks the residuals and writes `diagnostics_<mode>.json`; the log shows a
+short summary, and the Results tab has a **Diagnostics** page:
+
+- **Binned RMS.** The residuals are averaged in bins of 1, 2, 3, … 80 points and compared with what
+  white noise would give (rms/√n). β is the median ratio over 5–30 points (the factor the timing
+  error is already inflated by, Winn et al. 2008). β above 1.5 is reported as time-correlated noise.
+- **Autocorrelation** of the residuals at lags 1–30, with the ±3/√N significance band.
+- **Correlation with frame quantities**: airmass, sky background, image size (r90), x and y drift,
+  CCD temperature and the summed comparison-star flux (transparency). Significance uses the effective
+  number of points N/β², so red noise does not make chance correlations look real. A flagged
+  quantity is reported with the size of its effect in ppt across its observed range, which says
+  whether detrending against it is worth trying.
+
+```sh
+transitscope diagnose myproject.toml [--mode free]       # from the files of a run
+transitscope diagnose --lc lc.csv --model model.csv [--phot phot.csv --target 0] [--out d.json]
+```
+
+On the 2014 HD 189733 b data the residual rms is 6.5 ppt with β = 1.02, and no quantity is
+significant: the light curve is limited by white (scintillation and photon) noise.
+
+![Diagnostics page](docs/gui_diagnostics.png)
+
+### Checking a result: provenance
+
+Every stage of `run` writes `provenance/<stage>.json` in the output folder: the program version and
+git commit, compiler and system, start and end time, the complete settings, and the size and
+SHA-256 of every input and output file (frames, masters, star list, phot.csv, lc.csv, ld.json, fit
+and model files, diagnostics).
+
+```sh
+transitscope verify myproject.toml            # hashes everything again (2.1 GB of frames: ~10 s)
+transitscope verify myproject.toml --frames size   # frames by size only: instant
+```
+
+`verify` reports, per stage, files that changed or disappeared since they were recorded, a stage
+that used a different version of a file than the previous stage wrote (for example a fit made from
+an older lc.csv), and settings that changed since the stage ran. It exits with status 1 on a
+problem, so it can guard a script before results are uploaded.
+
 The single commands remain for scripting:
 
 ```sh
@@ -258,16 +300,16 @@ Pushing a version tag builds, checks and packages TransitScope on all three syst
 a GitHub release (`.github/workflows/release.yml`):
 
 ```sh
-# set project(transitscope VERSION 0.11.0) in CMakeLists.txt first: the workflow checks they match
-git tag v0.11.0 && git push origin v0.11.0
+# set project(transitscope VERSION 0.12.0) in CMakeLists.txt first: the workflow checks they match
+git tag v0.12.0 && git push origin v0.12.0
 ```
 
 | system | download | contents |
 |---|---|---|
-| Linux x86-64 (Debian 12 / Ubuntu 22.04 and newer) | `TransitScope-0.11.0-x86_64.AppImage` | desktop application |
-| | `transitscope-0.11.0-linux-x86_64.tar.gz` | `bin/transitscope`, `bin/transitscope-gui` with their libraries |
-| macOS 15+, Apple silicon | `TransitScope-0.11.0-macos-arm64.dmg` | `TransitScope.app` (the CLI is `Contents/MacOS/transitscope`) |
-| Windows x86-64 | `transitscope-0.11.0-windows-x86_64.zip` | `bin\transitscope-gui.exe`, `bin\transitscope.exe` with their DLLs |
+| Linux x86-64 (Debian 12 / Ubuntu 22.04 and newer) | `TransitScope-0.12.0-x86_64.AppImage` | desktop application |
+| | `transitscope-0.12.0-linux-x86_64.tar.gz` | `bin/transitscope`, `bin/transitscope-gui` with their libraries |
+| macOS 15+, Apple silicon | `TransitScope-0.12.0-macos-arm64.dmg` | `TransitScope.app` (the CLI is `Contents/MacOS/transitscope`) |
+| Windows x86-64 | `transitscope-0.12.0-windows-x86_64.zip` | `bin\transitscope-gui.exe`, `bin\transitscope.exe` with their DLLs |
 
 Each package carries the libraries it needs (made with linuxdeploy, macdeployqt and the MSYS2
 DLLs) and the data files; nothing else has to be installed. The programs find their data next to

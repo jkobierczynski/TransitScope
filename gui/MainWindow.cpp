@@ -739,7 +739,7 @@ bool MainWindow::exportLightCurve(int target, const QString& fileForTest) {
 void MainWindow::reloadResults() {
     if (!project_) return;
     const QString out = QString::fromStdString(project_->resolve(project_->output_dir));
-    results_->load(out, project_->lightcurve.eph.T14);
+    results_->load(out, project_->lightcurve.eph.T14, project_->lightcurve.target);
     updateComparisonMarks(out);
 }
 
@@ -796,7 +796,8 @@ void MainWindow::runForTest(const QString& screenshot, double cancelAfterSeconds
 }
 
 void MainWindow::screenshotAndQuit(const QString& file, int tab) {
-    tabs_->setCurrentIndex(tab);
+    tabs_->setCurrentIndex(std::min(tab, 1));   // 2: the results' diagnostics
+    results_->showTab(tab == 2 ? 1 : 0);
     auto* timer = new QTimer(this);
     auto start = std::make_shared<QDateTime>(QDateTime::currentDateTime());
     connect(timer, &QTimer::timeout, this, [this, timer, file, start] {

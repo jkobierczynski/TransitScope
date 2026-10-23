@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
     cli.addVersionOption();
     cli.addPositionalArgument("project", "Project file to open (.toml)");
     QCommandLineOption shot("screenshot", "Save a screenshot of the window to FILE and quit (testing).", "FILE");
-    QCommandLineOption tab("tab", "Tab in front for --screenshot (0 reference frame, 1 results).", "N", "0");
+    QCommandLineOption tab("tab", "Tab in front for --screenshot (0 reference frame, 1 results, 2 diagnostics).", "N", "0");
     QCommandLineOption run("test-run", "Run the project, save a screenshot to FILE when done and quit (testing).", "FILE");
     QCommandLineOption cancel("test-cancel-after", "With --test-run: cancel after SECONDS.", "SECONDS", "0");
     cli.addOption(shot);

@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.20)
-project(transitscope VERSION 0.11.0 LANGUAGES CXX)
+project(transitscope VERSION 0.12.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -62,10 +62,24 @@ add_library(transit
   src/reduce.cpp
   src/project.cpp
   src/export.cpp
+  src/provenance.cpp
+  src/diagnostics.cpp
   src/io/reader_factory.cpp)
 target_include_directories(transit PUBLIC include)
 target_include_directories(transit SYSTEM PRIVATE third_party/tomlplusplus)
 target_compile_definitions(transit PRIVATE TRANSIT_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/data")
+# version and commit for the provenance records (the commit as of the last CMake configure)
+find_package(Git QUIET)
+set(TRANSITSCOPE_GIT "unknown")
+if(GIT_FOUND AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git")
+  execute_process(COMMAND "${GIT_EXECUTABLE}" describe --always --dirty --tags
+                  WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" OUTPUT_VARIABLE TRANSITSCOPE_GIT
+                  OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+  if(NOT TRANSITSCOPE_GIT)
+    set(TRANSITSCOPE_GIT "unknown")
+  endif()
+endif()
+target_compile_definitions(transit PRIVATE TRANSITSCOPE_VERSION="${PROJECT_VERSION}" TRANSITSCOPE_GIT="${TRANSITSCOPE_GIT}")
 find_package(Threads REQUIRED)
 target_link_libraries(transit PUBLIC ${TRANSIT_ERFA_TARGET} Threads::Threads)
 target_compile_options(transit PRIVATE -Wall -Wextra -Wpedantic)
@@ -150,7 +164,7 @@ if(TRANSIT_WITH_GUI)
   find_package(Qt6 6.2 REQUIRED COMPONENTS Widgets Concurrent)
   set(CMAKE_AUTOMOC ON)
   set(GUI_SOURCES gui/main.cpp gui/MainWindow.cpp gui/SettingsEditor.cpp gui/ImageView.cpp gui/PlotWidget.cpp
-                  gui/ResultsView.cpp)
+                  gui/ResultsView.cpp gui/DiagnosticsView.cpp)
   if(WIN32)
     list(APPEND GUI_SOURCES packaging/transitscope.rc)               # the .exe icon
   elseif(APPLE)
@@ -179,7 +193,7 @@ if(TRANSIT_WITH_GUI)
   find_package(Qt6 COMPONENTS Test)
   if(Qt6Test_FOUND)
     add_executable(gui_test tests/gui/gui_test.cpp
-      gui/MainWindow.cpp gui/SettingsEditor.cpp gui/ImageView.cpp gui/PlotWidget.cpp gui/ResultsView.cpp)
+      gui/MainWindow.cpp gui/SettingsEditor.cpp gui/ImageView.cpp gui/PlotWidget.cpp gui/ResultsView.cpp gui/DiagnosticsView.cpp)
     target_include_directories(gui_test SYSTEM PRIVATE third_party/tomlplusplus)
     target_compile_definitions(gui_test PRIVATE TRANSITSCOPE_VERSION="${PROJECT_VERSION}")
     target_link_libraries(gui_test PRIVATE transit Qt6::Widgets Qt6::Concurrent Qt6::Test)
@@ -188,3 +202,8 @@ endif()
 
 add_executable(comp_stability_test tests/unit/comp_stability_test.cpp)
 target_link_libraries(comp_stability_test PRIVATE transit)
+
+add_executable(provenance_test tests/unit/provenance_test.cpp)
+target_link_libraries(provenance_test PRIVATE transit)
+add_executable(diagnostics_test tests/unit/diagnostics_test.cpp)
+target_link_libraries(diagnostics_test PRIVATE transit)

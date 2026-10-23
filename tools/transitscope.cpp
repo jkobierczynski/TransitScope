@@ -19,12 +19,14 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <tuple>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include "transit/calib.h"
+#include "transit/diagnostics.h"
 #include "transit/ensemble.h"
 #include "transit/export.h"
 #include "transit/fit.h"
@@ -284,9 +286,66 @@ int cmd_export(const Args& a) {
     return 0;
 }
 
+int cmd_verify(const Args& a) {
+    if (a.pos.size() != 1) throw std::invalid_argument("usage: transitscope verify project.toml [--frames size]");
+    const Project p = load_project(a.pos[0]);
+    const bool hash_frames = a.get("frames", "hash") != "size";
+    const VerifyReport r = verify_provenance(p, hash_frames);
+    for (const auto& l : r.lines)
+        std::cout << (l.kind == VerifyReport::Ok ? "ok       " : l.kind == VerifyReport::Info ? "--       " : "PROBLEM  ") << l.text << "\n";
+    std::cout << (r.ok() ? "\nall recorded results match their inputs\n" : "\nsome results do not match the recorded inputs\n");
+    return r.ok() ? 0 : 1;
+}
+
+int cmd_diagnose(const Args& a) {
+    // project form: the files of a run; file form: --lc lc.csv --model model.csv [--phot phot.csv --target N]
+    std::string lc, model, phot, out;
+    size_t target = std::stoul(a.get("target", "0"));
+    const std::string mode = a.get("mode", "constrained");
+    if (a.pos.size() == 1) {
+        const Project p = load_project(a.pos[0]);
+        lc = p.output("lc.csv");
+        model = p.output("model_" + mode + ".csv");
+        phot = p.output("phot.csv");
+        out = p.output("diagnostics_" + mode + ".json");
+        target = p.lightcurve.target;
+        if (!std::filesystem::exists(phot)) phot.clear();
+    } else if (a.pos.empty()) {
+        lc = a.need("lc");
+        model = a.need("model");
+        phot = a.get("phot");
+    } else {
+        throw std::invalid_argument("usage: transitscope diagnose project.toml [--mode constrained|free]\n"
+                                    "       transitscope diagnose --lc lc.csv --model model.csv [--phot phot.csv --target N] [--out F]");
+    }
+    if (!a.get("out").empty()) out = a.get("out");
+    const FitData d = load_fit_data(lc);
+    const std::vector<double> res = load_residuals(model);
+    if (res.size() != d.t.size())
+        throw std::runtime_error(model + " has " + std::to_string(res.size()) + " points, " + lc + " " +
+                                 std::to_string(d.t.size()) + ": the fit is older than the light curve; rerun the fit");
+    std::optional<PhotTable> t;
+    if (!phot.empty()) t = load_phot_csv(phot);
+    const Diagnostics dg = diagnose_fit(t ? &*t : nullptr, lc, d, res, target);
+    std::cout << diagnostics_summary(dg);
+    std::cout << "\nbinned rms (ppt):   n  bins   measured  white-noise  beta\n";
+    for (const auto& b : dg.bins) {
+        char buf[128];
+        std::snprintf(buf, sizeof buf, "               %5zu %5zu %10.3f %12.3f %5.2f\n", b.n, b.bins, b.rms * 1000, b.white * 1000, b.beta);
+        std::cout << buf;
+    }
+    if (!out.empty()) {
+        write_diagnostics_json(out, dg);
+        std::cout << "-> " << out << "\n";
+    }
+    return 0;
+}
+
 void usage() {
     std::cerr << "usage: transitscope run project.toml [--from STAGE] [--to STAGE] [--only STAGE]\n"
                  "                  stages: masters reduce lightcurve ld fit\n"
+                 "       transitscope verify project.toml [--frames size]   (results vs their recorded inputs)\n"
+                 "       transitscope diagnose project.toml [--mode constrained|free]   (red noise, systematics)\n"
                  "       transitscope export project.toml --to exoclock|etd [--out FILE]\n"
                  "       transitscope project new FILE      (write a commented example project)\n"
                  "       transitscope project check FILE    (validate it and show what it finds)\n\n"
@@ -315,6 +374,8 @@ int main(int argc, char** argv) {
         if (cmd == "ld") return cmd_ld(a);
         if (cmd == "run") return cmd_run(a);
         if (cmd == "export") return cmd_export(a);
+        if (cmd == "verify") return cmd_verify(a);
+        if (cmd == "diagnose") return cmd_diagnose(a);
         if (cmd == "project") return cmd_project(a);
         usage();
         return 2;

@@ -20,7 +20,9 @@ Three layers: **libtransit** (all science, no UI) → **transitscope** CLI (scri
 | batman quadratic model | `transit_model.h` (Mandel–Agol, AGM + Bulirsch elliptic integrals) | done; 2.4e-8 vs batman |
 | `fit.py`: emcee, priors, β red-noise factor | `mcmc.h` (stretch move, red/blue split, emcee autocorrelation estimator), `fit.h` (`fit_transit` with progress/cancel, `FitData`, posterior samples, `fit_curves`) | done; within 0.06 σ of emcee |
 | EXOFAST `quadld` + passband weighting | `limb_darkening.h` (Claret 2011 tables, filter × QE × blackbody average, error budget) | done; numpy check < 1e-6 |
-| `plot.py` | `gui/PlotWidget` (QPainter), `gui/ResultsView` | done in 0.8.0 |
+| `plot.py` | `gui/PlotWidget` (QPainter, linear and log axes), `gui/ResultsView` | done in 0.8.0 |
+| — | `provenance.h` (SHA-256, per-stage records), `project.h` (`verify_provenance`) | new in 0.12.0 |
+| β only | `diagnostics.h` (binned RMS, autocorrelation, correlation with frame quantities), `gui/DiagnosticsView` | new in 0.12.0 |
 
 ## Design decisions
 
@@ -32,6 +34,8 @@ Three layers: **libtransit** (all science, no UI) → **transitscope** CLI (scri
 - **Fit.** Quadratic-LD transit × quadratic baseline in time, noise scale exp(lnf) on the per-frame noise model, Gaussian LD priors; `constrained` adds a/Rs and i priors. Walkers are evaluated in parallel threads, with all random numbers drawn serially, so a seed gives the same chain on any thread count.
 - **Project file.** `Project` holds the configs of every stage (`ReduceConfig`, `EnsembleConfig`, `LdSettings`, `FitConfig`) plus frame sources and paths. Values shared by stages (period, site height, target star) are written once and copied into each config on load. The reader rejects unknown keys and wrong types and reports every problem with its line number; `project_to_toml` writes a file that loads back to the same project (save is atomic). Comments are not preserved on save; the GUI writes the canonical layout.
 - **GUI.** `gui/SettingsEditor` takes its list of keys, their types and tooltips from `project_template()`, so the file format has one definition; the tree is turned back into TOML and parsed with `parse_project` on every edit, and `check_project_inputs` fills the Problems list. `gui/ImageView` shows the reference frame in FITS orientation and edits the star list; `gui/MainWindow` keeps the star indices in `target_star`, `exclude_stars` and `comparison_stars` consistent when stars are removed. Runs use `run_project` on a copy of the project in a `QThread`; progress and log lines are posted to the GUI thread (throttled), cancelling sets an atomic flag the progress callback returns.
+- **Provenance.** `run_project` records each stage after it finishes: inputs and outputs are hashed on the thread pool (SHA-256 per FIPS 180-4, own implementation, no OpenSSL dependency) and written as JSON with one file per line. `verify_provenance` checks three things: each recorded file still has its size and hash; the chain (a stage's input equals what the earlier stage last recorded as its output); and the settings sections each stage depends on, compared with the current project. A changed setting is information, not an error: the results are still what the record says they are.
+- **Diagnostics.** `compute_diagnostics` takes residuals and any per-point quantities, so it is independent of the photometry; `frame_quantities` builds the standard set from phot.csv for the frames of lc.csv (comparison stars and radius from its header). β is computed exactly as in `fit_transit` (checked in `diagnostics_test`). Correlation significance is 3/√(N/β²). The GUI recomputes from the files rather than reading the JSON, so it also works on results of older versions.
 - **Long-format CSV between stages.** `reduce` writes one row per frame × star × all radii, so aperture and comparison choices are made later without re-measuring images (the GUI's instant comparison-star toggling relies on this cache).
 
 ## Known limitations / roadmap
@@ -44,3 +48,4 @@ Three layers: **libtransit** (all science, no UI) → **transitscope** CLI (scri
 6. Done in 0.7.0: TOML project file (`project.h`: `load_project`, `save_project`, `run_project`; `transitscope run`, `project new|check`). Open: plate solving via local `solve-field`; Gaia comparison-star candidates; Exoplanet Watch (AAVSO) export. ETD and ExoClock export done in 0.9.0 (`export.h`, `transitscope export`, Results tab).
 7. Done in 0.3.0: pipelined multithreaded `reduce` and faster photometry kernels (see README, Performance).
 8. The MCMC fit now dominates the run time (~40 s per mode on 2 cores). 16 000 steps is > 100 autocorrelation times; ~6 000 would do, or an automatic stop at 50 τ.
+9. Done in 0.12.0: provenance records with `transitscope verify`, and red-noise and systematics diagnostics. Open: detrending against a flagged quantity in the fit (a linear term per quantity), and a quality report combining both.

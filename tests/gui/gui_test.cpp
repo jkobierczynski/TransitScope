@@ -17,8 +17,10 @@
 #include <clocale>
 #include <cstdio>
 
+#include "../../gui/DiagnosticsView.h"
 #include "../../gui/ImageView.h"
 #include "../../gui/MainWindow.h"
+#include "../../gui/ResultsView.h"
 #include "../../gui/SettingsEditor.h"
 
 static int failures = 0;
@@ -107,6 +109,12 @@ public:
             const QString text = QString::fromUtf8(ef.readAll());
             check(text.startsWith("#Planet: ") && text.contains("#Time format: JD_UTC\n") && text.count('\n') > 100,
                   "the ExoClock file has the header and the points");
+            if (QDir(QString::fromStdString(w.project_->resolve(w.project_->output_dir))).exists("model_constrained.csv")) {
+                w.reloadResults();
+                const auto& dg = w.results_->diagnostics()->diagnostics();
+                check(dg.n > 100 && dg.bins.size() > 5 && dg.correlations.size() == 7 && dg.beta >= 1,
+                      QString("diagnostics in Results: %1 points, beta %2, %3 quantities").arg(dg.n).arg(dg.beta).arg(dg.correlations.size()));
+            }
         }
 
         // validation of edits

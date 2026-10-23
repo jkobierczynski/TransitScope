@@ -70,6 +70,12 @@ void PlotWidget::addHorizontalLine(double y, const QColor& c) {
     update();
 }
 
+void PlotWidget::setLog(bool lx, bool ly) {
+    logX_ = lx;
+    logY_ = ly;
+    resetZoom();
+}
+
 void PlotWidget::linkX(PlotWidget* other) {
     connect(this, &PlotWidget::xRangeChanged, other, [other](double a, double b) { other->setXRange(a, b, false); });
     connect(other, &PlotWidget::xRangeChanged, this, [this](double a, double b) { setXRange(a, b, false); });
@@ -79,12 +85,13 @@ QRectF PlotWidget::dataBounds() const {
     double xa = std::numeric_limits<double>::infinity(), xb = -xa, ya = xa, yb = -xa;
     for (const auto& s : series_)
         for (int i = 0; i < s.x.size(); ++i) {
-            if (!std::isfinite(s.x[i]) || !std::isfinite(s.y[i])) continue;
-            const double e = i < s.err.size() && std::isfinite(s.err[i]) ? s.err[i] : 0;
-            xa = std::min(xa, s.x[i]);
-            xb = std::max(xb, s.x[i]);
-            ya = std::min(ya, s.y[i] - e);
-            yb = std::max(yb, s.y[i] + e);
+            const double x = tx(s.x[i]), y = ty(s.y[i]);
+            if (!std::isfinite(x) || !std::isfinite(y)) continue;
+            const double e = !logY_ && i < s.err.size() && std::isfinite(s.err[i]) ? s.err[i] : 0;
+            xa = std::min(xa, x);
+            xb = std::max(xb, x);
+            ya = std::min(ya, y - e);
+            yb = std::max(yb, y + e);
         }
     if (!std::isfinite(xa)) return {0, 0, 1, 1};
     return QRectF(QPointF(xa, ya), QPointF(xb, yb));
@@ -94,12 +101,14 @@ void PlotWidget::autoY() {
     double ya = std::numeric_limits<double>::infinity(), yb = -ya;
     for (const auto& s : series_)
         for (int i = 0; i < s.x.size(); ++i) {
-            if (!std::isfinite(s.y[i]) || s.x[i] < x0_ || s.x[i] > x1_) continue;
-            const double e = i < s.err.size() && std::isfinite(s.err[i]) ? s.err[i] : 0;
-            ya = std::min(ya, s.y[i] - e);
-            yb = std::max(yb, s.y[i] + e);
+            const double x = tx(s.x[i]), y = ty(s.y[i]);
+            if (!std::isfinite(y) || !(x >= x0_ && x <= x1_)) continue;
+            const double e = !logY_ && i < s.err.size() && std::isfinite(s.err[i]) ? s.err[i] : 0;
+            ya = std::min(ya, y - e);
+            yb = std::max(yb, y + e);
         }
-    for (const auto& h : hlines_) { ya = std::min(ya, h.y); yb = std::max(yb, h.y); }
+    for (const auto& h : hlines_)
+        if (std::isfinite(ty(h.y))) { ya = std::min(ya, ty(h.y)); yb = std::max(yb, ty(h.y)); }
     if (!std::isfinite(ya)) { ya = 0; yb = 1; }
     if (yb - ya < 1e-12) { ya -= 0.5; yb += 0.5; }
     const double pad = 0.06 * (yb - ya);
@@ -149,27 +158,44 @@ void PlotWidget::paintEvent(QPaintEvent*) {
         p.drawText(rect(), Qt::AlignCenter | Qt::TextWordWrap, message_.isEmpty() ? tr("No data") : message_);
         return;
     }
-    auto X = [&](double x) { return a.left() + (x - x0_) / (x1_ - x0_) * a.width(); };
-    auto Y = [&](double y) { return a.bottom() - (y - y0_) / (y1_ - y0_) * a.height(); };
+    // X, Y: data value -> pixel; AX, AY: axis coordinate (log10 on a log axis) -> pixel
+    auto AX = [&](double x) { return a.left() + (x - x0_) / (x1_ - x0_) * a.width(); };
+    auto AY = [&](double y) { return a.bottom() - (y - y0_) / (y1_ - y0_) * a.height(); };
+    auto X = [&](double x) { return AX(tx(x)); };
+    auto Y = [&](double y) { return AY(ty(y)); };
+    // ticks: axis coordinate and its label
+    auto ticks = [](double lo, double hi, bool log, int n) {
+        QVector<QPair<double, QString>> t;
+        if (log) {
+            const bool sub = hi - lo < 2.5;   // 1, 2, 5 per decade over short ranges, decades otherwise
+            for (int d = int(std::floor(lo)); d <= int(std::ceil(hi)); ++d)
+                for (double m : {1.0, 2.0, 5.0}) {
+                    if (m != 1 && !sub) continue;
+                    const double v = d + std::log10(m);
+                    if (v < lo - 1e-9 || v > hi + 1e-9) continue;
+                    const double val = m * std::pow(10.0, d);
+                    t.push_back({v, QString::number(val, 'g', 6)});
+                }
+            return t;
+        }
+        const double s = niceStep(hi - lo, n);
+        for (double v = std::ceil(lo / s) * s; v <= hi; v += s) t.push_back({v, tickLabel(v, s)});
+        return t;
+    };
 
     // bands, grid and ticks
     p.save();
     p.setClipRect(a);
     for (const auto& b : bands_) p.fillRect(QRectF(QPointF(X(b.x0), a.top()), QPointF(X(b.x1), a.bottom())), b.c);
     p.restore();
-    const double xs = niceStep(x1_ - x0_, std::max(3, a.width() / 90)), ys = niceStep(y1_ - y0_, std::max(3, a.height() / 45));
+    const auto xt = ticks(x0_, x1_, logX_, std::max(3, a.width() / 90));
+    const auto yt = ticks(y0_, y1_, logY_, std::max(3, a.height() / 45));
     p.setPen(QPen(grid, 0, Qt::DotLine));
-    for (double v = std::ceil(x0_ / xs) * xs; v <= x1_; v += xs) p.drawLine(QPointF(X(v), a.top()), QPointF(X(v), a.bottom()));
-    for (double v = std::ceil(y0_ / ys) * ys; v <= y1_; v += ys) p.drawLine(QPointF(a.left(), Y(v)), QPointF(a.right(), Y(v)));
+    for (const auto& t : xt) p.drawLine(QPointF(AX(t.first), a.top()), QPointF(AX(t.first), a.bottom()));
+    for (const auto& t : yt) p.drawLine(QPointF(a.left(), AY(t.first)), QPointF(a.right(), AY(t.first)));
     p.setPen(fg);
-    for (double v = std::ceil(x0_ / xs) * xs; v <= x1_; v += xs) {
-        const QString t = tickLabel(v, xs);
-        p.drawText(QPointF(X(v) - fm.horizontalAdvance(t) / 2.0, a.bottom() + fm.ascent() + 4), t);
-    }
-    for (double v = std::ceil(y0_ / ys) * ys; v <= y1_; v += ys) {
-        const QString t = tickLabel(v, ys);
-        p.drawText(QPointF(a.left() - fm.horizontalAdvance(t) - 5, Y(v) + fm.ascent() / 2.0 - 1), t);
-    }
+    for (const auto& t : xt) p.drawText(QPointF(AX(t.first) - fm.horizontalAdvance(t.second) / 2.0, a.bottom() + fm.ascent() + 4), t.second);
+    for (const auto& t : yt) p.drawText(QPointF(a.left() - fm.horizontalAdvance(t.second) - 5, AY(t.first) + fm.ascent() / 2.0 - 1), t.second);
     p.drawRect(a);
     if (!title_.isEmpty()) {
         QFont bf = font();
@@ -197,7 +223,7 @@ void PlotWidget::paintEvent(QPaintEvent*) {
             QPainterPath path;
             bool started = false;
             for (int i = 0; i < s.x.size(); ++i) {
-                if (!std::isfinite(s.y[i])) { started = false; continue; }
+                if (!std::isfinite(ty(s.y[i])) || !std::isfinite(tx(s.x[i]))) { started = false; continue; }
                 const QPointF pt(X(s.x[i]), Y(s.y[i]));
                 if (started) path.lineTo(pt); else path.moveTo(pt);
                 started = true;
@@ -210,13 +236,13 @@ void PlotWidget::paintEvent(QPaintEvent*) {
             ec.setAlpha(90);
             p.setPen(QPen(ec, 1));
             for (int i = 0; i < s.err.size() && i < s.x.size(); ++i)
-                if (std::isfinite(s.err[i]) && std::isfinite(s.y[i]))
+                if (!logY_ && std::isfinite(s.err[i]) && std::isfinite(s.y[i]))
                     p.drawLine(QPointF(X(s.x[i]), Y(s.y[i] - s.err[i])), QPointF(X(s.x[i]), Y(s.y[i] + s.err[i])));
             p.setPen(Qt::NoPen);
             p.setBrush(s.color);
             const double r = s.size / 2;
             for (int i = 0; i < s.x.size(); ++i)
-                if (std::isfinite(s.y[i])) p.drawEllipse(QPointF(X(s.x[i]), Y(s.y[i])), r, r);
+                if (std::isfinite(ty(s.y[i])) && std::isfinite(tx(s.x[i]))) p.drawEllipse(QPointF(X(s.x[i]), Y(s.y[i])), r, r);
         }
     }
     p.restore();
@@ -260,8 +286,10 @@ void PlotWidget::mouseMoveEvent(QMouseEvent* e) {
         update();
     }
     if (a.contains(e->pos()) && !series_.isEmpty()) {
-        const double x = x0_ + (e->pos().x() - a.left()) * (x1_ - x0_) / a.width();
-        const double y = y0_ + (a.bottom() - e->pos().y()) * (y1_ - y0_) / a.height();
+        double x = x0_ + (e->pos().x() - a.left()) * (x1_ - x0_) / a.width();
+        double y = y0_ + (a.bottom() - e->pos().y()) * (y1_ - y0_) / a.height();
+        if (logX_) x = std::pow(10.0, x);
+        if (logY_) y = std::pow(10.0, y);
         setToolTip(QString("%1, %2").arg(x, 0, 'g', 8).arg(y, 0, 'g', 6));
     }
 }

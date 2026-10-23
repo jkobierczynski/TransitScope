@@ -96,4 +96,18 @@ std::vector<std::string> check_project_inputs(const Project& p, const RunOptions
 ///   fit         fit_<mode>.json, model_<mode>.csv for each mode
 void run_project(const Project& p, const RunOptions& opt = {}, const StageProgress& progress = {});
 
+/// <output_dir>/provenance/<stage>.json
+std::string provenance_path(const Project& p, Stage s);
+
+struct VerifyReport {
+    enum Kind { Ok, Info, Problem };
+    struct Line { Kind kind; std::string text; };
+    std::vector<Line> lines;
+    bool ok() const;   // no problems
+};
+/// Checks the provenance records against the files: every recorded input and output must still
+/// have its recorded size and SHA-256, and each stage must have used the outputs the previous
+/// stage recorded. hash_frames = false compares raw frames by size only (much faster).
+VerifyReport verify_provenance(const Project& p, bool hash_frames = true);
+
 }  // namespace transit

@@ -17,6 +17,9 @@ step() { echo; echo "=== $*"; }
 step "project file"
 (cd "$W" && "$B/project_test")
 
+step "provenance: SHA-256 test vectors, record round trip"
+(cd "$W" && "$B/provenance_test")
+
 step "Python reference photometry -> CSV"
 "$PY" -I "$HERE/npz_to_phot_csv.py" "$HERE/reference/phot.npz" "$HERE/reference/lc.npz" "$W/phot_ref.csv"
 
@@ -27,12 +30,16 @@ step "ensemble light curve vs the Python reference (its 0.2 % selection rule)"
 "$PY" -I "$HERE/compare_lightcurve.py" "$W/lc_ref.csv" "$HERE/reference/lc.npz" 1e-9
 
 step "MCMC fit vs emcee (constrained, 16000 steps)"
-"$B/transitscope" fit --lc "$W/lc_ref.csv" --mode constrained --out "$W/fitC.json"
+"$B/transitscope" fit --lc "$W/lc_ref.csv" --mode constrained --out "$W/fitC.json" --model-csv "$W/modelC.csv"
 "$PY" -I "$HERE/compare_fit.py" "$W/fitC.json" "$HERE/reference/fitC.json"
 
 step "limb darkening vs an independent numpy calculation"
 "$B/transitscope" ld --teff 5050 --logg 4.59 --feh -0.03 --teff-err 50 --logg-err 0.02 --feh-err 0.08 --out "$W/ld.json"
 "$PY" -I "$HERE/ld/check_ld.py" "$W/ld.json" "$ROOT/data"
+
+step "red-noise and systematics diagnostics: synthetic residuals, beta as in the fit"
+"$B/diagnostics_test" "$W/lc_ref.csv"
+"$B/transitscope" diagnose --lc "$W/lc_ref.csv" --model "$W/modelC.csv" --phot "$W/phot_ref.csv" --out "$W/diagC.json"
 
 step "fit API: progress, cancelling, in-memory data, thread count"
 (cd "$W" && "$B/fit_api_test" "$W/phot_ref.csv")
